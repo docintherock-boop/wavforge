@@ -2185,6 +2185,7 @@ input[type=range].mixer-master::-webkit-slider-thumb { -webkit-appearance: none;
         <button class="tb" onclick="showNoiseReductionModal()" title="Noise Reduction" style="font-size:9px;font-weight:700">NR</button>
         <button class="tb" onclick="trimSilence()" title="Trim Silence (removes dead air from selected track)" style="font-size:9px;font-weight:700">TRIM</button>
         <button class="tb" onclick="normalizeLoudness()" title="Normalize Loudness to podcast LUFS target" style="font-size:9px;font-weight:700">LUFS</button>
+        <button class="tb" onclick="showDuckingModal()" title="Duck selected track under a voice track" style="font-size:9px;font-weight:700">DUCK</button>
         <button class="tb rec" id="punchBtn" onclick="togglePunchIn()" title="Punch-In Record" style="font-size:9px;font-weight:700">PUNCH</button>
       </div>
       <!-- Zoom -->
@@ -2684,6 +2685,7 @@ input[type=range].mixer-master::-webkit-slider-thumb { -webkit-appearance: none;
   <div class="ctx-item" onclick="fadeOut()">Fade Out</div>
   <div class="ctx-item" onclick="normalizeTrack()">Normalize (Peak)</div>
   <div class="ctx-item" onclick="normalizeLoudness()">Normalize Loudness (LUFS)</div>
+  <div class="ctx-item" onclick="showDuckingModal()">Duck Under Voice Track…</div>
   <div class="ctx-sep"></div>
   <div class="ctx-item" onclick="convertToStereo()">⟨ST⟩ Mono → Stereo</div>
   <div class="ctx-item" onclick="splitStereoToTracks()">⟨ST⟩ Split L/R to Tracks</div>
@@ -2783,6 +2785,41 @@ input[type=range].mixer-master::-webkit-slider-thumb { -webkit-appearance: none;
     <div class="modal-actions" style="margin-top:16px">
       <button class="hdr-btn" onclick="closeModal('noiseModal')">Cancel</button>
       <button class="hdr-btn accent" id="nrApplyBtn" onclick="applyNoiseReduction()" disabled>Apply Reduction</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="duckingModal">
+  <div class="modal">
+    <h3>🦆 MUSIC DUCKING</h3>
+    <p style="font-size:11px;color:var(--text-lo);margin-bottom:14px;line-height:1.5">Automatically lowers the selected track's volume whenever another track (usually the voice) is active. Applies to <b style="color:var(--cyan)" id="duckTargetName">the selected track</b>.</p>
+
+    <label>Duck Under (voice/trigger track)</label>
+    <select id="duckVoiceTrack" style="width:100%;margin-bottom:10px"></select>
+
+    <label>Duck Amount <span id="duckAmountVal">-12 dB</span></label>
+    <input type="range" id="duckAmount" min="-30" max="0" step="1" value="-12"
+           oninput="document.getElementById('duckAmountVal').textContent=this.value+' dB'"
+           style="width:100%;margin-bottom:10px">
+
+    <label>Voice Threshold <span id="duckThreshVal">-35 dB</span></label>
+    <input type="range" id="duckThresh" min="-60" max="-10" step="1" value="-35"
+           oninput="document.getElementById('duckThreshVal').textContent=this.value+' dB'"
+           style="width:100%;margin-bottom:10px">
+
+    <label>Attack <span id="duckAttackVal">150 ms</span></label>
+    <input type="range" id="duckAttack" min="10" max="1000" step="10" value="150"
+           oninput="document.getElementById('duckAttackVal').textContent=this.value+' ms'"
+           style="width:100%;margin-bottom:10px">
+
+    <label>Release <span id="duckReleaseVal">400 ms</span></label>
+    <input type="range" id="duckRelease" min="10" max="2000" step="10" value="400"
+           oninput="document.getElementById('duckReleaseVal').textContent=this.value+' ms'"
+           style="width:100%;margin-bottom:6px">
+
+    <div class="modal-actions">
+      <button class="hdr-btn" onclick="closeModal('duckingModal')">Cancel</button>
+      <button class="hdr-btn accent" onclick="applyDucking()">Apply Ducking</button>
     </div>
   </div>
 </div>
@@ -4137,6 +4174,100 @@ function normalizeLoudness() {
     toast(limited
       ? `Peak-limited: reached ${(lufs + appliedDb).toFixed(1)} LUFS (target ${target})`
       : `✓ Normalized to ${target} LUFS (${appliedDb >= 0 ? '+' : ''}${appliedDb.toFixed(1)} dB)`);
+  }, 10);
+}
+
+// ═══════════════════════════════════════════
+//  MUSIC DUCKING (sidechain)
+// ═══════════════════════════════════════════
+function showDuckingModal() {
+  const tid = selTrackId;
+  if (!tid) { toast('Select the track to duck first'); return; }
+  const track = tracks.find(t => t.id === tid);
+  if (!track || !track.clips.length) { toast('Selected track has no audio'); return; }
+  const others = tracks.filter(t => t.id !== tid && t.clips.length);
+  if (!others.length) { toast('Add another track with voice audio to duck under'); return; }
+  document.getElementById('duckTargetName').textContent = `"${track.name}"`;
+  const sel = document.getElementById('duckVoiceTrack');
+  sel.innerHTML = others.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+  document.getElementById('duckingModal').classList.add('active');
+}
+
+// Per-window (20ms) peak envelope of a track across the full timeline; 0 where no clip plays.
+function duckVoiceEnvelope(voiceTrack, totalDur, windowSec) {
+  const numWindows = Math.max(1, Math.ceil(totalDur / windowSec));
+  const levels = new Float32Array(numWindows);
+  voiceTrack.clips.forEach(clip => {
+    const buf = clip.buffer, sr = buf.sampleRate, nc = buf.numberOfChannels;
+    const chans = []; for (let c = 0; c < nc; c++) chans.push(buf.getChannelData(c));
+    const winSamples = Math.max(1, Math.round(windowSec * sr));
+    const clipStartWin = Math.floor(clip.offset / windowSec);
+    for (let s0 = 0; s0 < buf.length; s0 += winSamples) {
+      const s1 = Math.min(buf.length, s0 + winSamples);
+      let mx = 0;
+      for (let c = 0; c < nc; c++) { const d = chans[c]; for (let i = s0; i < s1; i++) { const v = Math.abs(d[i]); if (v > mx) mx = v; } }
+      const gi = clipStartWin + Math.floor(s0 / winSamples);
+      if (gi >= 0 && gi < numWindows && mx > levels[gi]) levels[gi] = mx;
+    }
+  });
+  return levels;
+}
+
+// Smooths the raw voice envelope into an attack/release gain-reduction curve for the music track.
+function duckSmoothGain(levels, windowSec, threshold, duckGain, attackMs, releaseMs) {
+  const gains = new Float32Array(levels.length);
+  const attackWins  = Math.max(1, (attackMs  / 1000) / windowSec);
+  const releaseWins = Math.max(1, (releaseMs / 1000) / windowSec);
+  let g = 1;
+  for (let i = 0; i < levels.length; i++) {
+    const target = levels[i] > threshold ? duckGain : 1;
+    g += (target - g) / (target < g ? attackWins : releaseWins);
+    gains[i] = g;
+  }
+  return gains;
+}
+
+function applyDucking() {
+  const musicTrack = tracks.find(t => t.id === selTrackId);
+  const voiceTrack = tracks.find(t => t.id === +document.getElementById('duckVoiceTrack').value);
+  if (!musicTrack || !voiceTrack) { toast('Select valid tracks'); return; }
+
+  const duckDb   = +document.getElementById('duckAmount').value;
+  const threshDb = +document.getElementById('duckThresh').value;
+  const attackMs = +document.getElementById('duckAttack').value;
+  const releaseMs = +document.getElementById('duckRelease').value;
+
+  saveUndo();
+  closeModal('duckingModal');
+  toast('Applying ducking…');
+
+  setTimeout(() => {
+    const windowSec = 0.02;
+    const threshold = Math.pow(10, threshDb / 20);
+    const duckGain  = Math.pow(10, duckDb / 20);
+    const totalDur = Math.max(
+      ...musicTrack.clips.map(c => c.offset + c.buffer.duration),
+      ...voiceTrack.clips.map(c => c.offset + c.buffer.duration)
+    );
+    const levels = duckVoiceEnvelope(voiceTrack, totalDur, windowSec);
+    const gains  = duckSmoothGain(levels, windowSec, threshold, duckGain, attackMs, releaseMs);
+
+    musicTrack.clips.forEach(clip => {
+      cowClip(clip); // copy-on-write: undo snapshots keep the original buffer
+      const buf = clip.buffer, sr = buf.sampleRate;
+      for (let ch = 0; ch < buf.numberOfChannels; ch++) {
+        const d = buf.getChannelData(ch);
+        for (let i = 0; i < d.length; i++) {
+          const t = clip.offset + i / sr;
+          const gi = Math.min(gains.length - 1, Math.max(0, Math.floor(t / windowSec)));
+          d[i] *= gains[gi];
+        }
+      }
+      invalidateWaveCache(clip.buffer);
+    });
+
+    drawAll();
+    toast(`✓ Ducked "${musicTrack.name}" under "${voiceTrack.name}"`);
   }, 10);
 }
 
