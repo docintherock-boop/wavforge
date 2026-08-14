@@ -1146,15 +1146,15 @@ input[type=range].p-vol-slider::-webkit-slider-thumb {
   position: relative;
   background: #0a0b0d;
   display: flex; align-items: center; justify-content: center;
-  max-height: 160px;
+  max-height: 240px;
 }
 .p-art-img {
-  width: 100%; max-height: 160px;
+  width: 100%; max-height: 240px;
   object-fit: cover; display: block;
   border-radius: 8px;
 }
 .p-art-fallback {
-  width: 100%; height: 140px;
+  width: 100%; height: 220px;
   display: flex; align-items: center; justify-content: center;
   background: rgba(10,11,20,.4);
   border-radius: 8px; position: relative; overflow: hidden;
@@ -1168,12 +1168,10 @@ input[type=range].p-vol-slider::-webkit-slider-thumb {
   position: absolute; inset: 0; width: 100%; height: 100%;
   opacity: .8; z-index: 0;
 }
-.p-art-fallback svg { opacity: .18; position: relative; z-index: 1; }
-.p-art-fallback .p-art-title {
-  position: absolute; bottom: 12px; left: 0; right: 0;
-  text-align: center; z-index: 2;
-  font-family: var(--font-hud); font-size: 9px; letter-spacing: 3px;
-  color: #ffa62b44; text-transform: uppercase;
+.p-art-logo {
+  max-width: 62%; max-height: 78%;
+  object-fit: contain; position: relative; z-index: 1;
+  filter: drop-shadow(0 4px 24px rgba(0,0,0,.55));
 }
 
 /* ── EQ PANEL ── */
@@ -1791,7 +1789,7 @@ input[type=range].track-pan::-webkit-slider-thumb {
   /* Album art: taller on phone */
   .p-art-wrap   { max-height: 200px; margin-bottom: 14px; }
   .p-art-img    { max-height: 200px; }
-  .p-art-fallback { height: 180px; }
+  .p-art-fallback { height: 200px; }
 
   /* EQ panel: scroll horizontally on small screens */
   .p-eq-bands   { overflow-x: auto; padding-bottom: 4px; gap: 10px; }
@@ -2245,8 +2243,7 @@ input[type=range].mixer-master::-webkit-slider-thumb { -webkit-appearance: none;
       <div class="p-art-wrap" id="pArtWrap">
         <div class="p-art-fallback" id="pArtFallback">
           <canvas class="p-art-viz-canvas" id="pArtVizCanvas"></canvas>
-          <svg width="80" height="80" viewBox="0 0 24 24" fill="var(--cyan)"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-          <div class="p-art-title">WAVFORGE V6</div>
+          <img class="p-art-logo" src="logo-wavforge.webp" alt="WAVFORGE">
         </div>
         <img class="p-art-img" id="pArtImg" style="display:none" alt="Album Art">
       </div>
