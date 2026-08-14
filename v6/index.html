@@ -664,6 +664,16 @@ input[type=range].zoom-sl::-webkit-slider-thumb {
 ═══════════════════════════════════════════ */
 #editor-workspace { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
 
+/* ── EDITOR WATERMARK BADGE ── */
+.editor-badge {
+  position: absolute; bottom: 14px; left: 50%;
+  transform: translateX(-50%);
+  width: 130px; height: auto;
+  opacity: .55; pointer-events: none;
+  z-index: 3;
+  filter: drop-shadow(0 4px 14px rgba(0,0,0,.6));
+}
+
 /* ── EDITOR BACKGROUND ── */
 #editor-view { position: relative; }
 #editor-view::before {
@@ -2223,6 +2233,7 @@ input[type=range].mixer-master::-webkit-slider-thumb { -webkit-appearance: none;
         </div>
       </div>
     </div>
+    <img class="editor-badge" src="badge-wavforge.webp" alt="" aria-hidden="true">
   </div><!-- /editor-view -->
 
   <!-- PLAYER VIEW -->
