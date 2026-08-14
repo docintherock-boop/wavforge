@@ -2183,6 +2183,8 @@ input[type=range].mixer-master::-webkit-slider-thumb { -webkit-appearance: none;
       <div class="tg">
         <button class="tb" onclick="showCompressorModal()" title="Compressor / Limiter" style="font-size:9px;font-weight:700">COMP</button>
         <button class="tb" onclick="showNoiseReductionModal()" title="Noise Reduction" style="font-size:9px;font-weight:700">NR</button>
+        <button class="tb" onclick="trimSilence()" title="Trim Silence (removes dead air from selected track)" style="font-size:9px;font-weight:700">TRIM</button>
+        <button class="tb" onclick="normalizeLoudness()" title="Normalize Loudness to podcast LUFS target" style="font-size:9px;font-weight:700">LUFS</button>
         <button class="tb rec" id="punchBtn" onclick="togglePunchIn()" title="Punch-In Record" style="font-size:9px;font-weight:700">PUNCH</button>
       </div>
       <!-- Zoom -->
@@ -2676,10 +2678,12 @@ input[type=range].mixer-master::-webkit-slider-thumb { -webkit-appearance: none;
   <div class="ctx-item" onclick="pasteClip()">Paste at Playhead <span class="shortcut">⌘V</span></div>
   <div class="ctx-item" onclick="deleteSelection()">Delete Selection <span class="shortcut">Del</span></div>
   <div class="ctx-item" onclick="silenceSelection()">Silence Selection</div>
+  <div class="ctx-item" onclick="trimSilence()">Trim Silence (Track)</div>
   <div class="ctx-sep"></div>
   <div class="ctx-item" onclick="fadeIn()">Fade In</div>
   <div class="ctx-item" onclick="fadeOut()">Fade Out</div>
-  <div class="ctx-item" onclick="normalizeTrack()">Normalize Track</div>
+  <div class="ctx-item" onclick="normalizeTrack()">Normalize (Peak)</div>
+  <div class="ctx-item" onclick="normalizeLoudness()">Normalize Loudness (LUFS)</div>
   <div class="ctx-sep"></div>
   <div class="ctx-item" onclick="convertToStereo()">⟨ST⟩ Mono → Stereo</div>
   <div class="ctx-item" onclick="splitStereoToTracks()">⟨ST⟩ Split L/R to Tracks</div>
@@ -3172,7 +3176,7 @@ async function loadAudioFile(file, targetTrack) {
     if (!track) return; // hit max tracks
     track.clips.push({ buffer: buf, offset: 0, gain: 1, name: file.name.replace(/\.[^.]+$/, '') });
     renderTracks();
-    drawAll();
+    setZoom(pixelsPerSec);
     updateTrackBadge();
     setStatus(`Loaded: ${file.name} (${fmtTime(buf.duration)})`);
     toast(`✓ ${file.name}`);
@@ -3214,10 +3218,13 @@ function getTotalDuration() {
   return max;
 }
 
+const MAX_CANVAS_W = 8000; // stay well under browser/iOS-Safari canvas allocation limits
+
 function getCanvasWidth() {
   const dur = getTotalDuration();
   const area = document.getElementById('tracks-area');
-  return Math.max(area ? area.clientWidth - parseInt(getComputedStyle(document.documentElement).getPropertyValue('--gutter-w')) : 600, dur * pixelsPerSec + 400);
+  const base = area ? area.clientWidth - parseInt(getComputedStyle(document.documentElement).getPropertyValue('--gutter-w')) : 600;
+  return Math.min(MAX_CANVAS_W, Math.max(base, dur * pixelsPerSec + 400));
 }
 
 function drawWaveform(canvas, track) {
@@ -3364,11 +3371,30 @@ function drawWaveform(canvas, track) {
   }
 }
 
-// ── Waveform image cache keyed by clip buffer identity + zoom ──
+// ── Waveform peaks cache keyed by clip buffer identity (survives zoom/pan/redraws) ──
+// Peaks are computed once per buffer at a fixed resolution, independent of zoom level,
+// so redraw cost is O(canvas width) instead of O(file length). cowClip() always swaps in
+// a fresh buffer object before mutating, so a stale cache entry is never read: an edited
+// clip's buffer simply misses the cache and gets fresh peaks on next draw.
 const waveCache = new WeakMap();
+const PEAK_BUCKETS = 20000;
 
-function getWaveCacheKey(clip, w, h) {
-  return `${w}x${h}z${pixelsPerSec}g${clip.gain}`;
+function getPeaks(buf, chIdx) {
+  let entry = waveCache.get(buf);
+  if (!entry) { entry = []; waveCache.set(buf, entry); }
+  if (entry[chIdx]) return entry[chIdx];
+  const data = buf.getChannelData(chIdx), len = data.length;
+  const buckets = Math.max(1, Math.min(PEAK_BUCKETS, len));
+  const peaks = new Float32Array(buckets);
+  const bucketSize = len / buckets;
+  for (let b = 0; b < buckets; b++) {
+    const start = Math.floor(b * bucketSize), end = Math.max(start + 1, Math.floor((b + 1) * bucketSize));
+    let mx = 0;
+    for (let i = start; i < end && i < len; i++) { const v = Math.abs(data[i]); if (v > mx) mx = v; }
+    peaks[b] = mx;
+  }
+  entry[chIdx] = peaks;
+  return peaks;
 }
 
 function drawWaveformCached(canvas, track) {
@@ -3387,28 +3413,32 @@ function drawWaveformCached(canvas, track) {
   for (const clip of track.clips) {
     const buf    = clip.buffer;
     const startX = clip.offset * pixelsPerSec;
-    const clipW  = Math.ceil(buf.duration * pixelsPerSec);
+    const clipW  = buf.duration * pixelsPerSec;
+    if (startX + clipW < 0 || startX > w) continue; // fully offscreen
 
-    // Check cache
-    let clipCanvas = waveCache.get(buf);
-    const cacheKey = getWaveCacheKey(clip, clipW, h);
-    if (!clipCanvas || clipCanvas._key !== cacheKey) {
-      // Render clip to offscreen canvas and cache it
-      clipCanvas = document.createElement('canvas');
-      clipCanvas.width  = clipW;
-      clipCanvas.height = h;
-      clipCanvas._key   = cacheKey;
-      renderClipToCanvas(clipCanvas, clip, track.color, h);
-      waveCache.set(buf, clipCanvas);
+    // Clip background
+    ctx.fillStyle = track.color + '12';
+    ctx.fillRect(startX, 0, clipW, h);
+    ctx.strokeStyle = track.color + '33';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(startX, 0, clipW, h);
+
+    const isStereo = buf.numberOfChannels >= 2;
+    if (isStereo) {
+      const hH = h / 2;
+      ctx.strokeStyle = track.color + '22'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(startX, hH); ctx.lineTo(startX + clipW, hH); ctx.stroke();
+      [[0, 0, hH], [1, hH, hH]].forEach(([chIdx, yOff, chH]) => {
+        drawChannelPeaks(ctx, getPeaks(buf, chIdx), clip.gain, startX, clipW, w, chH, yOff,
+          track.color, chIdx === 0 ? 'aa' : '66', chIdx === 0 ? 'cc' : '77');
+      });
+    } else {
+      drawChannelPeaks(ctx, getPeaks(buf, 0), clip.gain, startX, clipW, w, h, 0, track.color, 'aa', 'cc');
     }
-
-    // Blit cached clip image at correct position
-    ctx.drawImage(clipCanvas, startX, 0);
 
     // Clip label (fast, on top)
     ctx.fillStyle = track.color + 'cc';
     ctx.font = '9px "JetBrains Mono",monospace';
-    const isStereo = buf.numberOfChannels >= 2;
     ctx.fillText((isStereo ? '⟨ST⟩ ' : '') + (clip.name || ''), startX + 4, 11);
   }
 
@@ -3424,46 +3454,11 @@ function drawWaveformCached(canvas, track) {
   }
 }
 
-function renderClipToCanvas(canvas, clip, color, h) {
-  const ctx  = canvas.getContext('2d');
-  const w    = canvas.width;
-  const buf  = clip.buffer;
-  const isStereo = buf.numberOfChannels >= 2;
-
-  // Clip background
-  ctx.fillStyle = color + '12';
-  ctx.fillRect(0, 0, w, h);
-  ctx.strokeStyle = color + '33';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(0, 0, w, h);
-
-  if (isStereo) {
-    const hH = h / 2;
-    ctx.strokeStyle = color + '22'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(0, hH); ctx.lineTo(w, hH); ctx.stroke();
-    [[0, 0, hH], [1, hH, hH]].forEach(([chIdx, yOff, chH]) => {
-      drawChannelWave(ctx, buf.getChannelData(chIdx), clip.gain, w, chH, yOff,
-        color, chIdx === 0 ? 'aa' : '66', chIdx === 0 ? 'cc' : '77');
-    });
-  } else {
-    drawChannelWave(ctx, buf.getChannelData(0), clip.gain, w, h, 0, color, 'aa', 'cc');
-  }
-}
-
-function drawChannelWave(ctx, data, gain, w, h, yOff, color, fillAlpha, strokeAlpha) {
-  const midY = yOff + h / 2;
-  const step = Math.max(1, Math.floor(data.length / w));
-
-  // Pre-compute peaks into typed array for speed
-  const peaks = new Float32Array(w);
-  for (let px = 0; px < w; px++) {
-    const si = Math.floor(px * data.length / w);
-    let mx = 0;
-    for (let s = 0; s < step && si + s < data.length; s++) {
-      const v = Math.abs(data[si + s]); if (v > mx) mx = v;
-    }
-    peaks[px] = mx * gain;
-  }
+function drawChannelPeaks(ctx, peaks, gain, startX, clipW, canvasW, h, yOff, color, fillAlpha, strokeAlpha) {
+  const midY = yOff + h / 2, plen = peaks.length;
+  const peakAt = px => peaks[Math.min(plen - 1, Math.floor(px * plen / clipW))] * gain;
+  const lo = Math.max(0, Math.floor(-startX)), hi = Math.min(Math.ceil(clipW), Math.ceil(canvasW - startX));
+  if (hi <= lo) return;
 
   const gr = ctx.createLinearGradient(0, yOff, 0, yOff + h);
   gr.addColorStop(0,   color + '40');
@@ -3471,15 +3466,15 @@ function drawChannelWave(ctx, data, gain, w, h, yOff, color, fillAlpha, strokeAl
   gr.addColorStop(1,   color + '40');
   ctx.fillStyle = gr;
   ctx.beginPath();
-  ctx.moveTo(0, midY);
-  for (let px = 0; px < w; px++) ctx.lineTo(px, midY - peaks[px] * h * 0.46);
-  for (let px = w - 1; px >= 0; px--) ctx.lineTo(px, midY + peaks[px] * h * 0.46);
+  ctx.moveTo(startX + lo, midY);
+  for (let px = lo; px < hi; px++) ctx.lineTo(startX + px, midY - peakAt(px) * h * 0.46);
+  for (let px = hi - 1; px >= lo; px--) ctx.lineTo(startX + px, midY + peakAt(px) * h * 0.46);
   ctx.closePath(); ctx.fill();
 
   ctx.strokeStyle = color + strokeAlpha; ctx.lineWidth = 0.75;
   ctx.beginPath();
-  for (let px = 0; px < w; px++) {
-    px === 0 ? ctx.moveTo(px, midY - peaks[px] * h * 0.46) : ctx.lineTo(px, midY - peaks[px] * h * 0.46);
+  for (let px = lo; px < hi; px++) {
+    px === lo ? ctx.moveTo(startX + px, midY - peakAt(px) * h * 0.46) : ctx.lineTo(startX + px, midY - peakAt(px) * h * 0.46);
   }
   ctx.stroke();
 }
@@ -3702,7 +3697,7 @@ async function toggleRecord() {
         const blob = new Blob(recordChunks, { type: mime || 'audio/webm' });
         const buf  = await audioCtx.decodeAudioData(await blob.arrayBuffer());
         recTrack.clips.push({ buffer: buf, offset: playheadTime, gain: 1, name: 'Recording' });
-        renderTracks(); drawAll();
+        renderTracks(); setZoom(pixelsPerSec);
         toast('✓ Recording saved');
       } catch (e) { console.error(e); toast('✗ Recording decode failed', true); }
     };
@@ -3768,7 +3763,7 @@ function restoreState(saved) {
     return { ...s, pan: s.pan || 0, gainNode: gn, panNode: panner,
       clips: s.clips.map(c => ({ offset: c.offset, gain: c.gain, name: c.name || '', buffer: c.buffer })) };
   });
-  renderTracks(); drawAll();
+  renderTracks(); setZoom(pixelsPerSec);
 }
 function undo() {
   if (!undoStack.length) return;
@@ -3920,7 +3915,7 @@ function pasteClip() {
   playheadTime = pasteAt + newBuf.duration;
   updateTimeDisplay(); updatePlayheadUI(); drawTimeline();
 
-  renderTracks(); drawAll();
+  renderTracks(); setZoom(pixelsPerSec);
   toast(`✓ Pasted at ${fmtTimePl(pasteAt)} on "${track.name}"`);
 }
 
@@ -4004,6 +3999,145 @@ function normalizeTrack() {
     invalidateWaveCache(clip.buffer);
   }
   drawAll(); toast('Normalized');
+}
+
+// ═══════════════════════════════════════════
+//  TRIM SILENCE
+// ═══════════════════════════════════════════
+function trimSilence() {
+  const tid = ctxTrackId || selTrackId;
+  if (!tid) { toast('Select a track first'); return; }
+  const track = tracks.find(t => t.id === tid);
+  if (!track || !track.clips.length) { toast('No audio to trim'); return; }
+  saveUndo();
+  const THRESHOLD = 0.01, MIN_SILENCE = 0.5, KEEP_PAD = 0.2;
+  let totalRemoved = 0, trimmedAny = false;
+  track.clips.forEach(clip => {
+    const buf = clip.buffer, sr = buf.sampleRate, nc = buf.numberOfChannels, len = buf.length;
+    const winSize = Math.max(1, Math.floor(sr * 0.02));
+    const chans = []; for (let c = 0; c < nc; c++) chans.push(buf.getChannelData(c));
+    const isSilent = i => {
+      const end = Math.min(len, i + winSize); let mx = 0;
+      for (let c = 0; c < nc; c++) { const d = chans[c]; for (let s = i; s < end; s++) { const v = Math.abs(d[s]); if (v > mx) mx = v; } }
+      return mx < THRESHOLD;
+    };
+    // A new AudioBuffer is built below rather than mutated in place, so this is
+    // already copy-on-write safe — no cowClip() needed before reassigning clip.buffer.
+    const keepRanges = []; let i = 0, segStart = 0;
+    while (i < len) {
+      if (isSilent(i)) {
+        const runStart = i; while (i < len && isSilent(i)) i += winSize;
+        const runEnd = Math.min(i, len), runDur = (runEnd - runStart) / sr;
+        if (segStart < runStart) keepRanges.push([segStart, runStart]);
+        if (runDur > MIN_SILENCE) {
+          const halfPad = Math.floor(KEEP_PAD * sr / 2), runLen = runEnd - runStart;
+          const headKeep = Math.min(halfPad, Math.floor(runLen / 2)), tailKeep = Math.min(halfPad, runLen - headKeep);
+          if (headKeep > 0) keepRanges.push([runStart, runStart + headKeep]);
+          if (tailKeep > 0) keepRanges.push([runEnd - tailKeep, runEnd]);
+        } else keepRanges.push([runStart, runEnd]);
+        segStart = runEnd;
+      } else i += winSize;
+    }
+    if (segStart < len) keepRanges.push([segStart, len]);
+    const newLen = keepRanges.reduce((a, r) => a + (r[1] - r[0]), 0);
+    if (newLen >= len || newLen <= 0) return;
+    const nb = audioCtx.createBuffer(nc, newLen, sr);
+    for (let c = 0; c < nc; c++) {
+      const src = chans[c], dst = nb.getChannelData(c); let o = 0;
+      for (const [s, e] of keepRanges) { dst.set(src.subarray(s, e), o); o += (e - s); }
+    }
+    totalRemoved += (len - newLen) / sr; trimmedAny = true;
+    clip.buffer = nb;
+  });
+  renderTracks(); setZoom(pixelsPerSec);
+  toast(trimmedAny ? `✓ Trimmed ${totalRemoved.toFixed(1)}s of dead air` : 'No silence found to trim');
+}
+
+// ═══════════════════════════════════════════
+//  LOUDNESS NORMALIZATION (ITU-R BS.1770 / EBU R128)
+// ═══════════════════════════════════════════
+function lufsBiquadCoeffs(type, fc, Q, G, sr) {
+  const K = Math.tan(Math.PI * fc / sr);
+  if (type === 'highshelf') {
+    const Vh = Math.pow(10, G / 20), Vb = Math.pow(Vh, 0.499666774155), a0 = 1 + K / Q + K * K;
+    return { b0: (Vh + Vb * K / Q + K * K) / a0, b1: 2 * (K * K - Vh) / a0, b2: (Vh - Vb * K / Q + K * K) / a0, a1: 2 * (K * K - 1) / a0, a2: (1 - K / Q + K * K) / a0 };
+  }
+  const a0 = 1 + K / Q + K * K;
+  return { b0: 1 / a0, b1: -2 / a0, b2: 1 / a0, a1: 2 * (K * K - 1) / a0, a2: (1 - K / Q + K * K) / a0 };
+}
+function lufsApplyBiquad(data, c) {
+  const out = new Float32Array(data.length); let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+  for (let i = 0; i < data.length; i++) {
+    const x0 = data[i], y0 = c.b0 * x0 + c.b1 * x1 + c.b2 * x2 - c.a1 * y1 - c.a2 * y2;
+    out[i] = y0; x2 = x1; x1 = x0; y2 = y1; y1 = y0;
+  }
+  return out;
+}
+function lufsKWeight(data, sr) {
+  const s1 = lufsBiquadCoeffs('highshelf', 1681.9744509555319, 0.7071752369554193, 3.99984385397, sr);
+  const s2 = lufsBiquadCoeffs('highpass', 38.13547087613982, 0.5003270373238773, 0, sr);
+  return lufsApplyBiquad(lufsApplyBiquad(data, s1), s2);
+}
+function measureLUFS(clips) {
+  const blockMS = [];
+  clips.forEach(clip => {
+    const buf = clip.buffer, sr = buf.sampleRate, nc = buf.numberOfChannels, len = buf.length;
+    const blockSize = Math.round(0.4 * sr), hop = Math.round(0.1 * sr);
+    if (len < blockSize) return;
+    const weighted = []; for (let c = 0; c < nc; c++) weighted.push(lufsKWeight(buf.getChannelData(c), sr));
+    for (let start = 0; start + blockSize <= len; start += hop) {
+      let sum = 0;
+      for (let c = 0; c < nc; c++) { let s = 0; const w = weighted[c]; for (let i = start; i < start + blockSize; i++) s += w[i] * w[i]; sum += s; }
+      blockMS.push(sum / blockSize);
+    }
+  });
+  if (!blockMS.length) return -Infinity;
+  const absGateMS = Math.pow(10, (-70 + 0.691) / 10);
+  let gated = blockMS.filter(ms => ms > absGateMS);
+  if (!gated.length) return -Infinity;
+  const meanMS = gated.reduce((a, b) => a + b, 0) / gated.length;
+  const relGateMS = Math.pow(10, ((-0.691 + 10 * Math.log10(meanMS) - 10) + 0.691) / 10);
+  gated = gated.filter(ms => ms > relGateMS);
+  if (!gated.length) return -Infinity;
+  const finalMeanMS = gated.reduce((a, b) => a + b, 0) / gated.length;
+  return -0.691 + 10 * Math.log10(finalMeanMS);
+}
+function normalizeLoudness() {
+  const tid = ctxTrackId || selTrackId;
+  if (!tid) { toast('Select a track first'); return; }
+  const track = tracks.find(t => t.id === tid);
+  if (!track || !track.clips.length) { toast('No audio to normalize'); return; }
+  setStatus('Analyzing loudness…'); toast('Analyzing loudness…');
+  setTimeout(() => {
+    const lufs = measureLUFS(track.clips);
+    if (!isFinite(lufs)) { toast('Audio too quiet to measure', true); setStatus('Ready'); return; }
+    saveUndo();
+    const isStereo = track.clips.some(c => c.buffer.numberOfChannels >= 2), target = isStereo ? -16 : -19;
+    let gain = Math.pow(10, (target - lufs) / 20);
+    let peak = 0;
+    track.clips.forEach(clip => {
+      for (let ch = 0; ch < clip.buffer.numberOfChannels; ch++) {
+        const d = clip.buffer.getChannelData(ch);
+        for (let i = 0; i < d.length; i++) { const v = Math.abs(d[i]); if (v > peak) peak = v; }
+      }
+    });
+    const maxGainForPeak = peak > 0 ? 0.891 / peak : Infinity;
+    let limited = false;
+    if (gain > maxGainForPeak) { gain = maxGainForPeak; limited = true; }
+    track.clips.forEach(clip => {
+      cowClip(clip); // copy-on-write: undo snapshots keep the original buffer
+      for (let ch = 0; ch < clip.buffer.numberOfChannels; ch++) {
+        const d = clip.buffer.getChannelData(ch);
+        for (let i = 0; i < d.length; i++) d[i] *= gain;
+      }
+      invalidateWaveCache(clip.buffer);
+    });
+    drawAll(); setStatus('Ready');
+    const appliedDb = 20 * Math.log10(gain);
+    toast(limited
+      ? `Peak-limited: reached ${(lufs + appliedDb).toFixed(1)} LUFS (target ${target})`
+      : `✓ Normalized to ${target} LUFS (${appliedDb >= 0 ? '+' : ''}${appliedDb.toFixed(1)} dB)`);
+  }, 10);
 }
 
 // ═══════════════════════════════════════════
@@ -4334,7 +4468,7 @@ async function finalizePunchIn(mime) {
     }
 
     track.clips.push({ buffer: newBuf, offset: punchInStart, gain: 1, name: '🎙 Punch-In' });
-    renderTracks(); drawAll();
+    renderTracks(); setZoom(pixelsPerSec);
     toast('✓ Punch-In recorded and placed');
   } catch(e) {
     console.error(e);
@@ -4913,8 +5047,12 @@ function setTool(t) {
 // ═══════════════════════════════════════════
 //  ZOOM
 // ═══════════════════════════════════════════
+function safeMaxPPS() {
+  const dur = getTotalDuration();
+  return dur > 0.001 ? Math.max(2, Math.floor((MAX_CANVAS_W - 400) / dur)) : 500;
+}
 function setZoom(v) {
-  pixelsPerSec = Math.max(2, Math.min(500, v));
+  pixelsPerSec = Math.max(2, Math.min(500, safeMaxPPS(), v));
   document.getElementById('zoomSlider').value = pixelsPerSec;
   document.getElementById('zoomLabel').textContent = pixelsPerSec + 'px/s';
   drawAll();
