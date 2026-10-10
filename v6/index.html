@@ -613,6 +613,7 @@ body::before {
 .tb.rec:hover { background: rgba(138,147,160,0.08); border-color: rgba(138,147,160,0.3); }
 .tb.rec.recording { color: var(--red); animation: blink-rec .9s infinite; }
 @keyframes blink-rec { 0%,100%{opacity:1} 50%{opacity:.3} }
+.tb svg { display: block; width: 16px; height: 16px; }
 
 /* Time display */
 .time-lcd {
@@ -2419,10 +2420,10 @@ input[type=range].mixer-master::-webkit-slider-thumb { -webkit-appearance: none;
     <div id="editor-toolbar">
       <!-- Transport -->
       <div class="tg">
-        <button class="tb" onclick="skipToStart()" title="Go to start (Home)">⏮</button>
-        <button class="tb play" id="playBtn" onclick="togglePlayback()" title="Play / Pause (Space)">▶</button>
-        <button class="tb" onclick="stopPlayback()" title="Stop">⏹</button>
-        <button class="tb rec" id="recordBtn" onclick="toggleRecord()" title="Record (R)">⏺</button>
+        <button class="tb" onclick="skipToStart()" title="Go to start (Home)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></button>
+        <button class="tb play" id="playBtn" onclick="togglePlayback()" title="Play / Pause (Space)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
+        <button class="tb" onclick="stopPlayback()" title="Stop"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12"/></svg></button>
+        <button class="tb rec" id="recordBtn" onclick="toggleRecord()" title="Record (R)"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="7"/></svg></button>
       </div>
       <!-- Time display -->
       <div class="tg">
@@ -2431,18 +2432,18 @@ input[type=range].mixer-master::-webkit-slider-thumb { -webkit-appearance: none;
       <!-- Tools -->
       <div class="tg">
         <button class="tb active" id="selectTool" onclick="setTool('select')" title="Move tool — drag clips (V)" style="font-size:10px;font-weight:700">MOVE</button>
-        <button class="tb" id="rangeTool" onclick="setTool('range')" title="Range Select — drag to select audio (R)" style="font-size:10px;font-weight:700">⬚ SEL</button>
-        <button class="tb" id="cutTool" onclick="setTool('cut')" title="Cut / Split (C)">✂</button>
+        <button class="tb" id="rangeTool" onclick="setTool('range')" title="Range Select — drag to select audio (R)" style="font-size:10px;font-weight:700;gap:4px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2.4"><rect x="4" y="4" width="16" height="16" rx="1"/></svg> SEL</button>
+        <button class="tb" id="cutTool" onclick="setTool('cut')" title="Cut / Split (C)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><line x1="20" y1="4" x2="8.5" y2="14.5"/><line x1="8.5" y1="9.5" x2="20" y2="20"/></svg></button>
       </div>
       <!-- Edit ops -->
       <div class="tg">
-        <button class="tb" onclick="deleteSelection()" title="Delete selection (Del)">🗑</button>
-        <button class="tb" onclick="undo()" title="Undo (Ctrl+Z)">↩</button>
-        <button class="tb" onclick="redo()" title="Redo (Ctrl+Y)">↪</button>
+        <button class="tb" onclick="deleteSelection()" title="Delete selection (Del)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button>
+        <button class="tb" onclick="undo()" title="Undo (Ctrl+Z)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10H18a4 4 0 0 1 0 8h-5"/><path d="M11 6l-4 4 4 4"/></svg></button>
+        <button class="tb" onclick="redo()" title="Redo (Ctrl+Y)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 10H6a4 4 0 0 0 0 8h5"/><path d="M13 6l4 4-4 4"/></svg></button>
       </div>
       <!-- Audio ops -->
       <div class="tg">
-        <button class="tb" onclick="silenceSelection()" title="Silence selection">🔇</button>
+        <button class="tb" onclick="silenceSelection()" title="Silence selection"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 5V4L8 9H4z" fill="currentColor" stroke="none"/><line x1="16" y1="9" x2="22" y2="15" fill="none"/><line x1="22" y1="9" x2="16" y2="15" fill="none"/></svg></button>
         <button class="tb" onclick="fadeIn()" title="Fade in" style="font-size:10px;font-weight:700">FI</button>
         <button class="tb" onclick="fadeOut()" title="Fade out" style="font-size:10px;font-weight:700">FO</button>
         <button class="tb" onclick="normalizeTrack()" title="Normalize track" style="font-size:10px;font-weight:700">NRM</button>
@@ -3897,7 +3898,7 @@ function togglePlayback() { isPlaying ? pausePlayback() : startPlayback(); }
 function startPlayback() {
   if (audioCtx.state === 'suspended') audioCtx.resume();
   isPlaying = true;
-  document.getElementById('playBtn').innerHTML = '⏸';
+  document.getElementById('playBtn').innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>';
   document.getElementById('playBtn').classList.add('active');
   playStartCtxTime = audioCtx.currentTime;
   playStartOffset  = playheadTime;
@@ -3965,7 +3966,7 @@ function updateVUMeters() {
 
 function pausePlayback() {
   isPlaying = false;
-  document.getElementById('playBtn').innerHTML = '▶';
+  document.getElementById('playBtn').innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
   document.getElementById('playBtn').classList.remove('active');
   sourceNodes.forEach(s => { try { s.stop(); } catch (_) {} });
   sourceNodes = [];
