@@ -666,7 +666,7 @@ input[type=range].zoom-sl::-webkit-slider-thumb {
   background: linear-gradient(180deg, transparent 70%, rgba(8,9,11,0.3) 100%);
 }
 .viz-controls {
-  position: absolute; top: 7px; right: 10px;
+  position: absolute; top: 7px; right: 46px;
   display: flex; gap: 3px; z-index: 5;
 }
 .viz-btn {
@@ -688,6 +688,18 @@ input[type=range].zoom-sl::-webkit-slider-thumb {
 .viz-label {
   position: absolute; bottom: 7px; left: 12px;
   font-family: var(--font-hud); font-size: 8px; letter-spacing: 2.5px; color: var(--text-lo);
+}
+
+/* ── MASTER PEAK/RMS METER ── */
+.master-meter {
+  position: absolute; top: 0; right: 0; bottom: 0; width: 38px; z-index: 4;
+  display: flex; flex-direction: column; align-items: center;
+  background: rgba(0,0,0,0.3); border-left: 1px solid var(--border);
+}
+#masterMeterCanvas { width: 100%; flex: 1; display: block; }
+.master-meter-label {
+  font-family: var(--font-mono); font-size: 7px; color: var(--text-lo);
+  letter-spacing: 3px; padding: 3px 0 4px; flex-shrink: 0;
 }
 
 /* ═══════════════════════════════════════════
@@ -1773,12 +1785,13 @@ input[type=range].track-pan::-webkit-slider-thumb {
 
 /* VU meter strip on each track header */
 .track-vu {
-  width: 100%; height: 5px; background: var(--bg-deep);
-  border-radius: 3px; overflow: hidden; margin-top: 2px;
+  width: 100%; height: 5px; border-radius: 3px; overflow: hidden;
+  margin-top: 2px; position: relative;
+  background: linear-gradient(90deg, var(--green) 0%, var(--green) 70%, var(--yellow) 85%, var(--orange) 93%, var(--red) 100%);
 }
 .track-vu-fill {
-  height: 100%; width: 0%; border-radius: 3px;
-  background: linear-gradient(90deg, var(--green) 0%, var(--yellow) 70%, var(--orange) 90%, var(--red) 100%);
+  position: absolute; top: 0; right: 0; bottom: 0; width: 100%;
+  background: var(--bg-deep);
   transition: width 0.05s ease-out;
 }
 
@@ -2413,6 +2426,10 @@ input[type=range].mixer-master::-webkit-slider-thumb { -webkit-appearance: none;
     <div id="viz-panel">
       <canvas id="viz-canvas"></canvas>
       <div class="viz-overlay"></div>
+      <div class="master-meter" id="masterMeter">
+        <canvas id="masterMeterCanvas"></canvas>
+        <div class="master-meter-label">L&nbsp;R</div>
+      </div>
       <div class="viz-controls">
         <button class="viz-btn active" data-mode="bars"     onclick="setVizMode('bars')">BARS</button>
         <button class="viz-btn"        data-mode="wave"     onclick="setVizMode('wave')">WAVE</button>
@@ -3032,6 +3049,20 @@ const FFT_SIZE = masterAnalyser.frequencyBinCount;
 const freqData = new Uint8Array(FFT_SIZE);
 const timeData = new Uint8Array(FFT_SIZE);
 
+// Stereo peak/RMS metering tap (separate from masterAnalyser, which WebAudio
+// downmixes to mono internally and can't give independent L/R levels).
+const meterSplitter = audioCtx.createChannelSplitter(2);
+masterGain.connect(meterSplitter);
+const meterAnalyserL = audioCtx.createAnalyser();
+const meterAnalyserR = audioCtx.createAnalyser();
+meterAnalyserL.fftSize = 512; meterAnalyserL.smoothingTimeConstant = 0;
+meterAnalyserR.fftSize = 512; meterAnalyserR.smoothingTimeConstant = 0;
+meterSplitter.connect(meterAnalyserL, 0);
+meterSplitter.connect(meterAnalyserR, 1);
+const meterDataL = new Float32Array(meterAnalyserL.fftSize);
+const meterDataR = new Float32Array(meterAnalyserR.fftSize);
+let meterPeakL = 0, meterPeakR = 0, meterHoldL = 0, meterHoldR = 0;
+
 const COLORS = ['#6b94c2','#8a93a0','#8f7bff','#3fe08c','#ff7a1a','#ffd24a','#2fd4c8','#ff5c86'];
 
 // ═══════════════════════════════════════════
@@ -3078,11 +3109,18 @@ function genId() { return ++trackIdCtr; }
 // ═══════════════════════════════════════════
 const vizCanvas = document.getElementById('viz-canvas');
 const vizCtx    = vizCanvas.getContext('2d');
+const meterCanvas = document.getElementById('masterMeterCanvas');
+const meterCtx     = meterCanvas ? meterCanvas.getContext('2d') : null;
 
 function resizeViz() {
   const p = vizCanvas.parentElement;
   vizCanvas.width  = p.clientWidth;
   vizCanvas.height = p.clientHeight;
+  if (meterCanvas) {
+    const r = meterCanvas.getBoundingClientRect();
+    meterCanvas.width  = Math.max(1, Math.round(r.width));
+    meterCanvas.height = Math.max(1, Math.round(r.height));
+  }
 }
 
 function setVizMode(m) {
@@ -3090,10 +3128,78 @@ function setVizMode(m) {
   document.querySelectorAll('.viz-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === m));
 }
 
+// ── Master peak/RMS meter ──
+function meterLevels(analyser, data) {
+  analyser.getFloatTimeDomainData(data);
+  let peak = 0, sumSq = 0;
+  for (let i = 0; i < data.length; i++) {
+    const v = Math.abs(data[i]);
+    if (v > peak) peak = v;
+    sumSq += data[i] * data[i];
+  }
+  return { peak, rms: Math.sqrt(sumSq / data.length) };
+}
+function drawMeterBar(x, y, w, h, rmsLevel, holdLevel) {
+  meterCtx.fillStyle = 'rgba(255,255,255,0.04)';
+  meterCtx.fillRect(x, y, w, h);
+
+  const dbFloor = -48;
+  const toY = level => {
+    const db = level > 0 ? 20 * Math.log10(level) : dbFloor;
+    const t = Math.max(0, Math.min(1, (db - dbFloor) / -dbFloor));
+    return h - t * h;
+  };
+
+  const fillY = toY(rmsLevel);
+  const gr = meterCtx.createLinearGradient(0, h, 0, 0);
+  gr.addColorStop(0, '#3fe08c'); gr.addColorStop(0.7, '#3fe08c');
+  gr.addColorStop(0.82, '#ffd24a'); gr.addColorStop(0.93, '#ff7a1a'); gr.addColorStop(1, '#ff3b47');
+  meterCtx.fillStyle = gr;
+  meterCtx.fillRect(x, fillY, w, h - fillY);
+
+  const holdY = toY(holdLevel);
+  meterCtx.fillStyle = holdLevel > 0.89 ? '#ff3b47' : 'rgba(255,255,255,0.75)';
+  meterCtx.fillRect(x, holdY - 1, w, 2);
+}
+function drawMasterMeter() {
+  if (!meterCtx) return;
+  const w = meterCanvas.width, h = meterCanvas.height;
+  if (!w || !h) return;
+  const lv = meterLevels(meterAnalyserL, meterDataL);
+  const rv = meterLevels(meterAnalyserR, meterDataR);
+
+  meterHoldL = lv.peak > meterHoldL ? lv.peak : Math.max(0, meterHoldL - 0.012);
+  meterHoldR = rv.peak > meterHoldR ? rv.peak : Math.max(0, meterHoldR - 0.012);
+
+  meterCtx.clearRect(0, 0, w, h);
+  const barW = w / 2 - 3, gap = 4;
+  drawMeterBar(2, 0, barW, h, lv.rms, meterHoldL);
+  drawMeterBar(barW + gap + 2, 0, barW, h, rv.rms, meterHoldR);
+}
+
+// ── Per-track VU strips (track-vu-fill is a dark cover that shrinks from
+// the right to reveal more of its parent's fixed green→red gradient) ──
+const trackVuScratch = new Float32Array(512);
+function updateTrackMeters() {
+  if (currentView !== 'editor') return;
+  tracks.forEach(t => {
+    const el = document.getElementById('vu-' + t.id);
+    if (!el || !t.vuAnalyser) return;
+    t.vuAnalyser.getFloatTimeDomainData(trackVuScratch);
+    let peak = 0;
+    for (let i = 0; i < trackVuScratch.length; i++) { const v = Math.abs(trackVuScratch[i]); if (v > peak) peak = v; }
+    const db  = peak > 0 ? 20 * Math.log10(peak) : -48;
+    const pct = Math.max(0, Math.min(100, ((db + 48) / 48) * 100));
+    el.style.width = (100 - pct) + '%';
+  });
+}
+
 function drawViz() {
   requestAnimationFrame(drawViz);
   masterAnalyser.getByteFrequencyData(freqData);
   masterAnalyser.getByteTimeDomainData(timeData);
+  drawMasterMeter();
+  updateTrackMeters();
   const w = vizCanvas.width, h = vizCanvas.height;
 
   // Fade trail
@@ -3211,6 +3317,9 @@ function makeTrackData(name, color) {
   const panner = audioCtx.createStereoPanner ? audioCtx.createStereoPanner() : null;
   if (panner) { gn.connect(panner); panner.connect(masterGain); }
   else gn.connect(masterGain);
+  const vu = audioCtx.createAnalyser();
+  vu.fftSize = 512; vu.smoothingTimeConstant = 0;
+  gn.connect(vu); // tap only - doesn't affect the main signal path
   return {
     id: genId(),
     name: name || `Track ${tracks.length + 1}`,
@@ -3222,6 +3331,7 @@ function makeTrackData(name, color) {
     pan: 0,
     gainNode: gn,
     panNode: panner,
+    vuAnalyser: vu,
     rack: []
   };
 }
@@ -3910,18 +4020,21 @@ function saveUndo() {
 }
 function restoreState(saved) {
   const oldNodes = {};
-  tracks.forEach(t => { oldNodes[t.id] = { gn: t.gainNode, pn: t.panNode }; });
+  tracks.forEach(t => { oldNodes[t.id] = { gn: t.gainNode, pn: t.panNode, vu: t.vuAnalyser }; });
   tracks = saved.map(s => {
     const old = oldNodes[s.id];
     const gn = old ? old.gn : audioCtx.createGain();
     const panner = old ? old.pn : (audioCtx.createStereoPanner ? audioCtx.createStereoPanner() : null);
+    const vu = old ? old.vu : audioCtx.createAnalyser();
     if (!old) {
       if (panner) { gn.connect(panner); panner.connect(masterGain); }
       else gn.connect(masterGain);
+      vu.fftSize = 512; vu.smoothingTimeConstant = 0;
+      gn.connect(vu);
     }
     gn.gain.value = s.volume;
     if (panner) panner.pan.value = s.pan || 0;
-    return { ...s, pan: s.pan || 0, gainNode: gn, panNode: panner,
+    return { ...s, pan: s.pan || 0, gainNode: gn, panNode: panner, vuAnalyser: vu,
       clips: s.clips.map(c => ({ offset: c.offset, gain: c.gain, name: c.name || '', buffer: c.buffer })),
       rack: (s.rack || []).map(fx => ({ ...fx, params: { ...fx.params } })) };
   });
