@@ -3896,10 +3896,19 @@ function ensurePlayheads() {
 function togglePlayback() { isPlaying ? pausePlayback() : startPlayback(); }
 
 function startPlayback() {
-  if (audioCtx.state === 'suspended') audioCtx.resume();
   isPlaying = true;
   document.getElementById('playBtn').innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>';
   document.getElementById('playBtn').classList.add('active');
+  startPlaybackAudio();
+}
+
+async function startPlaybackAudio() {
+  // iOS Safari requires the context to be confirmed "running" before
+  // scheduling source nodes, or they get silently dropped - unlike
+  // desktop browsers, which tolerate starting them while still suspended.
+  if (audioCtx.state === 'suspended') await audioCtx.resume();
+  if (!isPlaying) return; // paused again before resume() settled
+
   playStartCtxTime = audioCtx.currentTime;
   playStartOffset  = playheadTime;
 
@@ -5979,7 +5988,20 @@ function playerToggle() { playerPlaying ? playerPause() : playerPlay(); }
 
 function playerPlay() {
   if (!playerBuf) return;
-  if (audioCtx.state === 'suspended') audioCtx.resume();
+  playerPlaying = true;
+  const btn = document.getElementById('playerPlayBtn');
+  if (btn) btn.classList.add('playing');
+  const icon = document.getElementById('pPlayIcon');
+  if (icon) icon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+  playerPlayAudio();
+}
+
+async function playerPlayAudio() {
+  // See startPlaybackAudio(): iOS Safari needs the context confirmed
+  // "running" before a source is scheduled, or it's silently dropped.
+  if (audioCtx.state === 'suspended') await audioCtx.resume();
+  if (!playerPlaying) return; // paused again before resume() settled
+
   playerSrc = audioCtx.createBufferSource(); playerSrc.buffer = playerBuf;
   playerSrc.playbackRate.value = SPEED_STEPS[speedIdx];
   playerSrc.connect(playerGainNode);
@@ -5991,11 +6013,6 @@ function playerPlay() {
   };
   playerStartCtx = audioCtx.currentTime;
   playerSrc.start(0, playerOffset);
-  playerPlaying = true;
-  const btn = document.getElementById('playerPlayBtn');
-  if (btn) btn.classList.add('playing');
-  const icon = document.getElementById('pPlayIcon');
-  if (icon) icon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
   playerUpdateLoop();
 }
 
@@ -6557,7 +6574,22 @@ function deckToggle(id) {
 function deckPlay(id) {
   const d = decks[id];
   if (!d.buf || d.playing) return;
-  if (audioCtx.state === 'suspended') audioCtx.resume();
+  d.playing = true;
+  const btn = document.getElementById(`deck${id}-play`);
+  btn.classList.add('playing');
+  btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>';
+  document.getElementById(`deck${id}-vinyl`).classList.add('spinning', `deck-${id.toLowerCase()}`);
+  document.getElementById('djOnAirBadge').classList.add('live');
+  deckPlayAudio(id);
+}
+
+async function deckPlayAudio(id) {
+  const d = decks[id];
+  // See startPlaybackAudio(): iOS Safari needs the context confirmed
+  // "running" before a source is scheduled, or it's silently dropped.
+  if (audioCtx.state === 'suspended') await audioCtx.resume();
+  if (!d.playing) return; // paused/stopped again before resume() settled
+
   d.src = audioCtx.createBufferSource();
   d.src.buffer = d.buf;
   d.src.playbackRate.value = d.pitch;
@@ -6567,12 +6599,6 @@ function deckPlay(id) {
   d.src.start(0, startOff);
   d.startCtx = audioCtx.currentTime;
   d.offset   = startOff;
-  d.playing  = true;
-  const btn = document.getElementById(`deck${id}-play`);
-  btn.classList.add('playing');
-  btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>';
-  document.getElementById(`deck${id}-vinyl`).classList.add('spinning', `deck-${id.toLowerCase()}`);
-  document.getElementById('djOnAirBadge').classList.add('live');
   // Track end
   d.src.onended = () => {
     if (d.playing && !d.loop) { deckStop(id); if (autoPlayEnabled) djAutoAdvance(); }
@@ -6838,14 +6864,23 @@ function cartTrigger(i) {
     document.getElementById(`cart-prog-${i}`).style.width = '0%';
     return;
   }
-  if (audioCtx.state === 'suspended') audioCtx.resume();
+  c.playing = true;
+  document.getElementById(`cart-${i}`).classList.add('playing');
+  cartTriggerAudio(i);
+}
+
+async function cartTriggerAudio(i) {
+  const c = carts[i];
+  // See startPlaybackAudio(): iOS Safari needs the context confirmed
+  // "running" before a source is scheduled, or it's silently dropped.
+  if (audioCtx.state === 'suspended') await audioCtx.resume();
+  if (!c.playing) return; // stopped again before resume() settled
+
   c.src = audioCtx.createBufferSource();
   c.src.buffer = c.buf;
   c.src.connect(masterGain);
   c.src.start();
-  c.playing = true;
   c.startTime = audioCtx.currentTime;
-  document.getElementById(`cart-${i}`).classList.add('playing');
   c.src.onended = () => {
     c.playing = false;
     document.getElementById(`cart-${i}`).classList.remove('playing');
