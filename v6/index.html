@@ -756,6 +756,48 @@ input[type=range].zoom-sl::-webkit-slider-thumb {
 #tracks-area { flex: 1; overflow-y: auto; overflow-x: auto; position: relative; }
 #tracks-wrapper { min-height: 100%; }
 
+/* ── FILES PANEL (Audition-style media pool, docked left) ── */
+#files-panel {
+  width: 210px; flex-shrink: 0;
+  background: rgba(10,11,14,0.88);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  overflow-y: auto; overflow-x: hidden;
+}
+.files-header {
+  flex-shrink: 0; padding: 10px 12px 8px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(20,23,27,0.9);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.files-title {
+  font-family: var(--font-hud); font-size: 10px; letter-spacing: 2px;
+  color: var(--text-mid); text-transform: uppercase;
+}
+.files-count {
+  font-family: var(--font-mono); font-size: 10px; color: var(--cyan);
+  background: rgba(107,148,194,0.12); border-radius: 8px; padding: 1px 7px;
+}
+.files-empty { padding: 22px 14px; text-align: center; color: var(--text-lo); font-size: 11px; line-height: 1.6; }
+.files-list { flex: 1; overflow-y: auto; padding: 6px; }
+.file-item {
+  display: flex; align-items: center; gap: 8px; padding: 7px 8px;
+  background: rgba(25,28,33,0.85); border: 1px solid var(--border);
+  border-radius: 4px; margin-bottom: 5px; cursor: pointer;
+}
+.file-item:hover { border-color: rgba(107,148,194,0.35); background: rgba(30,34,40,0.9); }
+.file-icon { font-size: 13px; flex-shrink: 0; opacity: .8; }
+.file-meta { flex: 1; min-width: 0; }
+.file-name { font-size: 11px; color: var(--text-hi); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file-sub { font-size: 9.5px; color: var(--text-lo); font-family: var(--font-mono); margin-top: 1px; }
+.file-actions { display: flex; align-items: center; gap: 1px; flex-shrink: 0; }
+.file-actions button {
+  width: 19px; height: 19px; display: flex; align-items: center; justify-content: center;
+  background: transparent; border: none; color: var(--text-lo); cursor: pointer;
+  font-size: 11px; border-radius: 3px;
+}
+.file-actions button:hover { color: var(--text-hi); background: rgba(255,255,255,0.08); }
+
 /* ── EFFECTS RACK (Audition-style docked panel) ── */
 #effects-rack {
   width: 260px; flex-shrink: 0;
@@ -2441,6 +2483,7 @@ input[type=range].mixer-master::-webkit-slider-thumb { -webkit-appearance: none;
 
     <!-- WORKSPACE -->
     <div id="editor-workspace">
+      <aside id="files-panel"></aside>
       <div id="editor-main-col">
         <div id="timeline">
           <div class="tl-gutter"><span>TRACKS</span></div>
@@ -3442,9 +3485,11 @@ async function loadAudioFile(file, targetTrack) {
     if (audioCtx.state === 'suspended') await audioCtx.resume();
     const ab  = await file.arrayBuffer();
     const buf = await audioCtx.decodeAudioData(ab);
-    const track = targetTrack || addTrack(file.name.replace(/\.[^.]+$/, ''));
+    const fileName = file.name.replace(/\.[^.]+$/, '');
+    addToMediaPool(fileName, buf);
+    const track = targetTrack || addTrack(fileName);
     if (!track) return; // hit max tracks
-    track.clips.push({ buffer: buf, offset: 0, gain: 1, name: file.name.replace(/\.[^.]+$/, '') });
+    track.clips.push({ buffer: buf, offset: 0, gain: 1, name: fileName });
     renderTracks();
     setZoom(pixelsPerSec);
     updateTrackBadge();
@@ -3966,6 +4011,8 @@ async function toggleRecord() {
       try {
         const blob = new Blob(recordChunks, { type: mime || 'audio/webm' });
         const buf  = await audioCtx.decodeAudioData(await blob.arrayBuffer());
+        const takeName = `Recording ${new Date().toLocaleTimeString([], { hour12: false })}`;
+        addToMediaPool(takeName, buf);
         recTrack.clips.push({ buffer: buf, offset: playheadTime, gain: 1, name: 'Recording' });
         renderTracks(); setZoom(pixelsPerSec);
         toast('✓ Recording saved');
@@ -4507,6 +4554,81 @@ function applyDucking() {
     drawAll();
     toast(`✓ Ducked "${musicTrack.name}" under "${voiceTrack.name}"`);
   }, 10);
+}
+
+// ═══════════════════════════════════════════
+//  FILES PANEL (Audition-style media pool)
+// ═══════════════════════════════════════════
+// A passive catalog of every file imported or recorded this session,
+// independent of the editor's existing "import creates a track" flow.
+// Lets a clip be reused across tracks without re-importing from disk.
+let mediaPool = [];
+let mediaPoolCounter = 0;
+
+function addToMediaPool(name, buffer) {
+  mediaPool.push({
+    id: ++mediaPoolCounter, name, buffer,
+    duration: buffer.duration, sampleRate: buffer.sampleRate, channels: buffer.numberOfChannels
+  });
+  renderFilesPanel();
+}
+
+function filesPoolInsertAsTrack(poolId) {
+  const item = mediaPool.find(m => m.id === poolId);
+  if (!item) return;
+  const track = addTrack(item.name);
+  if (!track) return;
+  track.clips.push({ buffer: item.buffer, offset: 0, gain: 1, name: item.name });
+  renderTracks(); setZoom(pixelsPerSec);
+  toast(`✓ Inserted "${item.name}" as a new track`);
+}
+
+function filesPoolInsertAtPlayhead(poolId) {
+  const item = mediaPool.find(m => m.id === poolId);
+  if (!item) return;
+  const track = tracks.find(t => t.id === selTrackId);
+  if (!track) { toast('Select a track first', true); return; }
+  saveUndo();
+  track.clips.push({ buffer: item.buffer, offset: playheadTime, gain: 1, name: item.name });
+  renderTracks(); setZoom(pixelsPerSec);
+  toast(`✓ Inserted "${item.name}" at playhead on "${track.name}"`);
+}
+
+function filesPoolRemove(poolId) {
+  mediaPool = mediaPool.filter(m => m.id !== poolId);
+  renderFilesPanel();
+}
+
+function renderFilesPanel() {
+  const panel = document.getElementById('files-panel');
+  if (!panel) return;
+
+  if (!mediaPool.length) {
+    panel.innerHTML = `
+      <div class="files-header"><div class="files-title">FILES</div></div>
+      <div class="files-empty">Imported and recorded audio will appear here.</div>`;
+    return;
+  }
+
+  panel.innerHTML = `
+    <div class="files-header">
+      <div class="files-title">FILES</div>
+      <div class="files-count">${mediaPool.length}</div>
+    </div>
+    <div class="files-list">
+      ${mediaPool.map(m => `
+        <div class="file-item" ondblclick="filesPoolInsertAsTrack(${m.id})" title="Double-click to insert as a new track">
+          <div class="file-icon">🎵</div>
+          <div class="file-meta">
+            <div class="file-name">${escHtml(m.name)}</div>
+            <div class="file-sub">${fmtTimePl(m.duration)} · ${m.channels >= 2 ? 'Stereo' : 'Mono'} · ${m.sampleRate}Hz</div>
+          </div>
+          <div class="file-actions">
+            <button title="Insert at playhead on selected track" onclick="event.stopPropagation();filesPoolInsertAtPlayhead(${m.id})">⏎</button>
+            <button title="Remove from list" onclick="event.stopPropagation();filesPoolRemove(${m.id})">✕</button>
+          </div>
+        </div>`).join('')}
+    </div>`;
 }
 
 // ═══════════════════════════════════════════
@@ -6232,6 +6354,7 @@ drawTimeline();
 setTool('select');
 updateTrackBadge();
 renderEffectsRack();
+renderFilesPanel();
 document.getElementById('zoomLabel').textContent = pixelsPerSec + 'px/s';
 initEq();
 
