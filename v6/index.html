@@ -458,6 +458,37 @@ body::before {
 #app { display: flex; flex-direction: column; height: 100vh; position: relative; z-index: 1; }
 
 /* ═══════════════════════════════════════════
+   MENU BAR (Audition-style)
+═══════════════════════════════════════════ */
+#menu-bar {
+  height: 26px; flex-shrink: 0; display: flex; align-items: stretch;
+  background: #121416; border-bottom: 1px solid var(--border);
+  position: relative; z-index: 110; -webkit-user-select: none; user-select: none;
+}
+.menu-item { position: relative; }
+.menu-trigger {
+  height: 100%; padding: 0 12px; background: transparent; border: none;
+  color: var(--text-mid); font-family: var(--font-ui); font-size: 11px; font-weight: 500;
+  cursor: pointer; letter-spacing: .3px;
+}
+.menu-item:hover .menu-trigger, .menu-item.open .menu-trigger { color: var(--text-hi); background: rgba(255,255,255,0.06); }
+.menu-dropdown {
+  display: none; position: absolute; top: 100%; left: 0; min-width: 220px;
+  background: #1a1d21; border: 1px solid var(--border); border-radius: 0 0 5px 5px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.55); padding: 4px; z-index: 111;
+}
+.menu-item.open .menu-dropdown { display: block; }
+.menu-opt {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  width: 100%; padding: 6px 10px; background: transparent; border: none; border-radius: 3px;
+  color: var(--text-hi); font-family: var(--font-ui); font-size: 11.5px; text-align: left; cursor: pointer;
+}
+.menu-opt:hover { background: rgba(255,166,43,0.12); color: var(--cyan); }
+.menu-opt .menu-key { color: var(--text-lo); font-family: var(--font-mono); font-size: 9.5px; }
+.menu-opt:hover .menu-key { color: var(--cyan); opacity: .7; }
+.menu-sep { height: 1px; background: var(--border); margin: 4px 2px; }
+
+/* ═══════════════════════════════════════════
    HEADER / TABS
 ═══════════════════════════════════════════ */
 #header {
@@ -2208,6 +2239,93 @@ input[type=range].mixer-master::-webkit-slider-thumb { -webkit-appearance: none;
 
 <!-- APP SHELL -->
 <div id="app">
+
+  <!-- MENU BAR -->
+  <nav id="menu-bar">
+    <div class="menu-item" data-menu="file">
+      <button class="menu-trigger" onclick="toggleMenu('file')">File</button>
+      <div class="menu-dropdown">
+        <button class="menu-opt" onclick="menuAction(importFiles)">Import Audio Files…</button>
+        <button class="menu-opt" onclick="menuAction(saveProject)">Save Project</button>
+        <button class="menu-opt" onclick="menuAction(loadProject)">Open Project…</button>
+        <div class="menu-sep"></div>
+        <button class="menu-opt" onclick="menuAction(showExportModal)">Export…</button>
+      </div>
+    </div>
+    <div class="menu-item" data-menu="edit">
+      <button class="menu-trigger" onclick="toggleMenu('edit')">Edit</button>
+      <div class="menu-dropdown">
+        <button class="menu-opt" onclick="menuAction(undo)">Undo <span class="menu-key">Ctrl+Z</span></button>
+        <button class="menu-opt" onclick="menuAction(redo)">Redo <span class="menu-key">Ctrl+Y</span></button>
+        <div class="menu-sep"></div>
+        <button class="menu-opt" onclick="menuAction(cutSelection)">Cut <span class="menu-key">Ctrl+X</span></button>
+        <button class="menu-opt" onclick="menuAction(copySelection)">Copy <span class="menu-key">Ctrl+C</span></button>
+        <button class="menu-opt" onclick="menuAction(pasteClip)">Paste <span class="menu-key">Ctrl+V</span></button>
+        <button class="menu-opt" onclick="menuAction(deleteSelection)">Delete <span class="menu-key">Del</span></button>
+      </div>
+    </div>
+    <div class="menu-item" data-menu="multitrack">
+      <button class="menu-trigger" onclick="toggleMenu('multitrack')">Multitrack</button>
+      <div class="menu-dropdown">
+        <button class="menu-opt" onclick="menuAction(addTrack)">Add Track</button>
+        <button class="menu-opt" onclick="menuAction(menuRemoveTrack)">Remove Selected Track</button>
+        <div class="menu-sep"></div>
+        <button class="menu-opt" onclick="menuAction(zoomToFit)">Zoom to Fit <span class="menu-key">F</span></button>
+      </div>
+    </div>
+    <div class="menu-item" data-menu="clip">
+      <button class="menu-trigger" onclick="toggleMenu('clip')">Clip</button>
+      <div class="menu-dropdown">
+        <button class="menu-opt" onclick="menuAction(cutAtPlayhead)">Split at Playhead <span class="menu-key">S</span></button>
+        <button class="menu-opt" onclick="menuAction(fadeIn)">Fade In</button>
+        <button class="menu-opt" onclick="menuAction(fadeOut)">Fade Out</button>
+        <button class="menu-opt" onclick="menuAction(silenceSelection)">Silence</button>
+        <div class="menu-sep"></div>
+        <button class="menu-opt" onclick="menuAction(normalizeTrack)">Normalize (Peak)</button>
+        <button class="menu-opt" onclick="menuAction(normalizeLoudness)">Normalize Loudness (LUFS)</button>
+        <button class="menu-opt" onclick="menuAction(trimSilence)">Trim Silence</button>
+        <div class="menu-sep"></div>
+        <button class="menu-opt" onclick="menuAction(convertToStereo)">Mono → Stereo</button>
+        <button class="menu-opt" onclick="menuAction(splitStereoToTracks)">Split Stereo to Tracks</button>
+      </div>
+    </div>
+    <div class="menu-item" data-menu="effects">
+      <button class="menu-trigger" onclick="toggleMenu('effects')">Effects</button>
+      <div class="menu-dropdown">
+        <button class="menu-opt" onclick="menuAction(() => fxAddEffect('compressor'))">Add Compressor / Limiter</button>
+        <button class="menu-opt" onclick="menuAction(() => fxAddEffect('noiseReduction'))">Add Noise Reduction</button>
+        <div class="menu-sep"></div>
+        <button class="menu-opt" onclick="menuAction(showDuckingModal)">Duck Under Voice Track…</button>
+      </div>
+    </div>
+    <div class="menu-item" data-menu="view">
+      <button class="menu-trigger" onclick="toggleMenu('view')">View</button>
+      <div class="menu-dropdown">
+        <button class="menu-opt" onclick="menuAction(() => setVizMode('bars'))">Analysis: Bars</button>
+        <button class="menu-opt" onclick="menuAction(() => setVizMode('wave'))">Analysis: Wave</button>
+        <button class="menu-opt" onclick="menuAction(() => setVizMode('circle'))">Analysis: Ring</button>
+        <button class="menu-opt" onclick="menuAction(() => setVizMode('spectrum'))">Analysis: Scope</button>
+        <div class="menu-sep"></div>
+        <button class="menu-opt" onclick="menuAction(zoomIn)">Zoom In <span class="menu-key">+</span></button>
+        <button class="menu-opt" onclick="menuAction(zoomOut)">Zoom Out <span class="menu-key">−</span></button>
+        <button class="menu-opt" onclick="menuAction(zoomToFit)">Zoom to Fit <span class="menu-key">F</span></button>
+      </div>
+    </div>
+    <div class="menu-item" data-menu="window">
+      <button class="menu-trigger" onclick="toggleMenu('window')">Window</button>
+      <div class="menu-dropdown">
+        <button class="menu-opt" onclick="menuAction(() => switchView('editor'))">Editor</button>
+        <button class="menu-opt" onclick="menuAction(() => switchView('player'))">Player</button>
+        <button class="menu-opt" onclick="menuAction(() => switchView('dj'))">DJ</button>
+      </div>
+    </div>
+    <div class="menu-item" data-menu="help">
+      <button class="menu-trigger" onclick="toggleMenu('help')">Help</button>
+      <div class="menu-dropdown">
+        <button class="menu-opt" onclick="menuAction(showHelp)">Keyboard Shortcuts</button>
+      </div>
+    </div>
+  </nav>
 
   <!-- HEADER -->
   <header id="header">
@@ -5900,11 +6018,34 @@ document.getElementById('helpModal').addEventListener('click', e => { if (e.targ
 document.getElementById('exportModal').addEventListener('click', e => { if (e.target === document.getElementById('exportModal')) closeExportModal(); });
 
 // ═══════════════════════════════════════════
+//  MENU BAR
+// ═══════════════════════════════════════════
+let openMenu = null;
+function toggleMenu(name) {
+  openMenu = openMenu === name ? null : name;
+  document.querySelectorAll('.menu-item').forEach(el => el.classList.toggle('open', el.dataset.menu === openMenu));
+}
+function closeMenus() {
+  if (!openMenu) return;
+  openMenu = null;
+  document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('open'));
+}
+function menuAction(fn) {
+  closeMenus();
+  fn();
+}
+function menuRemoveTrack() {
+  if (!selTrackId) { toast('Select a track first', true); return; }
+  removeTrack(selTrackId);
+}
+document.addEventListener('click', e => { if (!e.target.closest('.menu-item')) closeMenus(); });
+
+// ═══════════════════════════════════════════
 //  KEYBOARD SHORTCUTS
 // ═══════════════════════════════════════════
 document.addEventListener('keydown', e => {
   const inInput = e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA';
-  if (e.key === 'Escape') { closeExportModal(); closeHelp(); return; }
+  if (e.key === 'Escape') { closeExportModal(); closeHelp(); closeMenus(); return; }
   if (inInput) return;
   switch (e.key) {
     case ' ':        e.preventDefault(); currentView === 'player' ? playerToggle() : togglePlayback(); break;
