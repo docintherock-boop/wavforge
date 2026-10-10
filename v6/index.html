@@ -662,7 +662,8 @@ input[type=range].zoom-sl::-webkit-slider-thumb {
 /* ═══════════════════════════════════════════
    EDITOR WORKSPACE
 ═══════════════════════════════════════════ */
-#editor-workspace { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+#editor-workspace { flex: 1; display: flex; flex-direction: row; overflow: hidden; min-height: 0; }
+#editor-main-col { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; min-width: 0; }
 
 /* ── EDITOR WATERMARK BADGE ── */
 .editor-badge {
@@ -711,6 +712,99 @@ input[type=range].zoom-sl::-webkit-slider-thumb {
 /* Tracks area */
 #tracks-area { flex: 1; overflow-y: auto; overflow-x: auto; position: relative; }
 #tracks-wrapper { min-height: 100%; }
+
+/* ── EFFECTS RACK (Audition-style docked panel) ── */
+#effects-rack {
+  width: 260px; flex-shrink: 0;
+  background: rgba(10,11,14,0.88);
+  border-left: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  overflow-y: auto; overflow-x: hidden;
+}
+.fx-rack-header {
+  flex-shrink: 0; padding: 10px 12px 8px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(20,23,27,0.9);
+}
+.fx-rack-title {
+  font-family: var(--font-hud); font-size: 10px; letter-spacing: 2px;
+  color: var(--text-mid); text-transform: uppercase;
+}
+.fx-rack-track {
+  font-size: 12px; color: var(--text-hi); font-weight: 600;
+  margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  display: flex; align-items: center; gap: 6px;
+}
+.fx-rack-track .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.fx-rack-empty {
+  padding: 22px 14px; text-align: center; color: var(--text-lo);
+  font-size: 11px; line-height: 1.6;
+}
+.fx-slots { flex: 1; overflow-y: auto; padding: 6px; }
+.fx-slot {
+  background: rgba(25,28,33,0.85); border: 1px solid var(--border);
+  border-radius: 4px; margin-bottom: 6px; overflow: hidden;
+}
+.fx-slot.disabled { opacity: .55; }
+.fx-slot-row {
+  display: flex; align-items: center; gap: 7px;
+  padding: 7px 8px; cursor: pointer; user-select: none;
+}
+.fx-slot-num {
+  font-family: var(--font-mono); font-size: 10px; color: var(--text-lo);
+  width: 14px; flex-shrink: 0; text-align: center;
+}
+.fx-power {
+  width: 15px; height: 15px; border-radius: 50%; flex-shrink: 0;
+  border: 1.5px solid var(--text-lo); background: transparent;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; padding: 0;
+}
+.fx-power::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: transparent; }
+.fx-slot:not(.disabled) .fx-power { border-color: var(--magenta); box-shadow: 0 0 6px rgba(77,169,255,0.5); }
+.fx-slot:not(.disabled) .fx-power::before { background: var(--magenta); }
+.fx-slot-name { flex: 1; font-size: 11.5px; color: var(--text-hi); font-weight: 600; letter-spacing: .3px; }
+.fx-slot-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.fx-slot-actions button {
+  width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;
+  background: transparent; border: none; color: var(--text-lo); cursor: pointer;
+  font-size: 11px; border-radius: 3px;
+}
+.fx-slot-actions button:hover { color: var(--text-hi); background: rgba(255,255,255,0.06); }
+.fx-slot-actions button:disabled { opacity: .3; cursor: default; }
+.fx-slot-actions button:disabled:hover { background: transparent; color: var(--text-lo); }
+.fx-slot-body { padding: 4px 10px 10px; border-top: 1px solid var(--border); }
+.fx-row { margin-bottom: 8px; }
+.fx-row label {
+  display: flex; justify-content: space-between; font-size: 9.5px;
+  color: var(--text-mid); text-transform: uppercase; letter-spacing: .5px;
+  margin-bottom: 3px; font-weight: 600;
+}
+.fx-row label span { color: var(--magenta); font-family: var(--font-mono); text-transform: none; letter-spacing: 0; }
+.fx-row input[type=range] { width: 100%; }
+.fx-row-check { display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-mid); }
+.fx-nr-step { font-size: 10px; color: var(--text-lo); line-height: 1.5; margin-bottom: 6px; }
+.fx-sample-btn {
+  width: 100%; padding: 5px 0; margin-bottom: 8px;
+  background: rgba(77,169,255,0.1); border: 1px solid rgba(77,169,255,0.3);
+  color: var(--magenta); border-radius: 3px; font-size: 10.5px; font-weight: 600;
+  cursor: pointer; letter-spacing: .3px;
+}
+.fx-sample-btn.sampled { background: rgba(63,224,140,0.1); border-color: rgba(63,224,140,0.35); color: var(--green); }
+.fx-add-row { padding: 8px 6px; border-top: 1px solid var(--border); }
+.fx-add-row select {
+  width: 100%; padding: 7px 8px; background: var(--bg-deep); border: 1px solid var(--border);
+  color: var(--text-hi); border-radius: 4px; font-size: 11px; font-family: var(--font-ui);
+}
+.fx-apply-row { padding: 8px; border-top: 1px solid var(--border); flex-shrink: 0; }
+.fx-apply-btn {
+  width: 100%; padding: 9px 0; background: linear-gradient(135deg, rgba(255,166,43,0.22), rgba(255,122,26,0.22));
+  border: 1px solid rgba(255,166,43,0.4); color: var(--cyan);
+  border-radius: 4px; font-size: 11px; font-weight: 700; letter-spacing: 1px;
+  text-transform: uppercase; cursor: pointer; font-family: var(--font-ui);
+}
+.fx-apply-btn:hover { border-color: var(--cyan); box-shadow: 0 0 14px rgba(255,166,43,0.25); }
+.fx-apply-btn:disabled { opacity: .4; cursor: default; box-shadow: none; }
 
 /* Track row */
 .track {
@@ -2057,13 +2151,6 @@ input[type=range].mixer-master::-webkit-slider-thumb { -webkit-appearance: none;
   .dj-cart-grid { grid-template-columns: repeat(6,1fr); }
 }
 
-/* ── NOISE REDUCTION MODAL ── */
-.nr-steps { display: flex; flex-direction: column; gap: 14px; }
-.nr-step { display: flex; gap: 12px; align-items: flex-start; padding: 12px; border-radius: 8px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); }
-.nr-step-num { width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0; background: rgba(255,166,43,0.15); border: 1px solid rgba(255,166,43,0.3); display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 11px; color: var(--cyan); }
-.nr-step-title { font-size: 12px; font-weight: 600; color: var(--text-hi); margin-bottom: 4px; }
-.nr-step-desc { font-size: 10px; color: var(--text-lo); margin-bottom: 6px; }
-.nr-sampled { font-family: var(--font-mono); font-size: 10px; color: var(--green); margin-top: 6px; letter-spacing: 1px; }
 
 /* ── PUNCH-IN INDICATOR ── */
 .punch-in-bar { position: fixed; top: var(--header-h); left: 0; right: 0; z-index: 200; height: 3px; background: linear-gradient(90deg, var(--red), #ff7a1a, var(--red)); background-size: 200% 100%; animation: punch-bar-anim 1s linear infinite; display: none; }
@@ -2189,8 +2276,6 @@ input[type=range].mixer-master::-webkit-slider-thumb { -webkit-appearance: none;
       </div>
       <!-- New effects -->
       <div class="tg">
-        <button class="tb" onclick="showCompressorModal()" title="Compressor / Limiter" style="font-size:9px;font-weight:700">COMP</button>
-        <button class="tb" onclick="showNoiseReductionModal()" title="Noise Reduction" style="font-size:9px;font-weight:700">NR</button>
         <button class="tb" onclick="trimSilence()" title="Trim Silence (removes dead air from selected track)" style="font-size:9px;font-weight:700">TRIM</button>
         <button class="tb" onclick="normalizeLoudness()" title="Normalize Loudness to podcast LUFS target" style="font-size:9px;font-weight:700">LUFS</button>
         <button class="tb" onclick="showDuckingModal()" title="Duck selected track under a voice track" style="font-size:9px;font-weight:700">DUCK</button>
@@ -2221,17 +2306,20 @@ input[type=range].mixer-master::-webkit-slider-thumb { -webkit-appearance: none;
 
     <!-- WORKSPACE -->
     <div id="editor-workspace">
-      <div id="timeline">
-        <div class="tl-gutter"><span>TRACKS</span></div>
-        <canvas id="timeline-canvas"></canvas>
-      </div>
-      <div id="tracks-area">
-        <div id="tracks-wrapper"></div>
-        <div class="add-track-row" onclick="addTrack()">
-          <span style="font-size:16px;margin-right:2px">+</span>
-          <span>ADD TRACK</span>
+      <div id="editor-main-col">
+        <div id="timeline">
+          <div class="tl-gutter"><span>TRACKS</span></div>
+          <canvas id="timeline-canvas"></canvas>
+        </div>
+        <div id="tracks-area">
+          <div id="tracks-wrapper"></div>
+          <div class="add-track-row" onclick="addTrack()">
+            <span style="font-size:16px;margin-right:2px">+</span>
+            <span>ADD TRACK</span>
+          </div>
         </div>
       </div>
+      <aside id="effects-rack"></aside>
     </div>
     <img class="editor-badge" src="badge-wavforge.webp" alt="" aria-hidden="true">
   </div><!-- /editor-view -->
@@ -2704,99 +2792,6 @@ input[type=range].mixer-master::-webkit-slider-thumb { -webkit-appearance: none;
   <div class="ctx-item danger" onclick="removeTrackCtx()">Remove Track</div>
 </div>
 
-<!-- COMPRESSOR MODAL -->
-<div class="modal-overlay" id="compressorModal">
-  <div class="modal">
-    <h3>⚡ COMPRESSOR / LIMITER</h3>
-    <p style="font-size:11px;color:var(--text-lo);margin-bottom:14px;line-height:1.5">Evens out loud and quiet parts. Great for voices and podcasts. Apply to the selected track.</p>
-
-    <label>Threshold <span id="compThreshVal">-24 dB</span></label>
-    <input type="range" id="compThresh" min="-60" max="0" step="1" value="-24"
-           oninput="document.getElementById('compThreshVal').textContent=this.value+' dB'"
-           style="width:100%;margin-bottom:10px">
-
-    <label>Ratio <span id="compRatioVal">4:1</span></label>
-    <input type="range" id="compRatio" min="1" max="20" step="0.5" value="4"
-           oninput="document.getElementById('compRatioVal').textContent=this.value+':1'"
-           style="width:100%;margin-bottom:10px">
-
-    <label>Attack <span id="compAttackVal">10 ms</span></label>
-    <input type="range" id="compAttack" min="1" max="200" step="1" value="10"
-           oninput="document.getElementById('compAttackVal').textContent=this.value+' ms'"
-           style="width:100%;margin-bottom:10px">
-
-    <label>Release <span id="compReleaseVal">100 ms</span></label>
-    <input type="range" id="compRelease" min="10" max="1000" step="10" value="100"
-           oninput="document.getElementById('compReleaseVal').textContent=this.value+' ms'"
-           style="width:100%;margin-bottom:10px">
-
-    <label>Make-up Gain <span id="compGainVal">+6 dB</span></label>
-    <input type="range" id="compGain" min="0" max="24" step="0.5" value="6"
-           oninput="document.getElementById('compGainVal').textContent='+'+this.value+' dB'"
-           style="width:100%;margin-bottom:6px">
-
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
-      <label style="display:flex;align-items:center;gap:5px;margin-bottom:0;text-transform:none;font-size:11px;color:var(--text-mid)">
-        <input type="checkbox" id="compLimiter"> Enable hard limiter at 0 dBFS
-      </label>
-    </div>
-
-    <div style="font-size:9px;color:var(--text-lo);margin-bottom:14px;font-family:var(--font-mono)">
-      PRESET:
-      <button class="ctx-item" style="display:inline;padding:2px 6px;border:1px solid var(--border);border-radius:3px;background:var(--bg-deep);cursor:pointer;font-size:9px" onclick="setCompPreset('podcast')">PODCAST</button>
-      <button class="ctx-item" style="display:inline;padding:2px 6px;border:1px solid var(--border);border-radius:3px;background:var(--bg-deep);cursor:pointer;font-size:9px" onclick="setCompPreset('music')">MUSIC</button>
-      <button class="ctx-item" style="display:inline;padding:2px 6px;border:1px solid var(--border);border-radius:3px;background:var(--bg-deep);cursor:pointer;font-size:9px" onclick="setCompPreset('limit')">LIMITER</button>
-    </div>
-
-    <div class="modal-actions">
-      <button class="hdr-btn" onclick="closeModal('compressorModal')">Cancel</button>
-      <button class="hdr-btn accent" onclick="applyCompressor()">Apply to Track</button>
-    </div>
-  </div>
-</div>
-
-<!-- NOISE REDUCTION MODAL -->
-<div class="modal-overlay" id="noiseModal">
-  <div class="modal">
-    <h3>🔇 NOISE REDUCTION</h3>
-    <p style="font-size:11px;color:var(--text-lo);margin-bottom:14px;line-height:1.5">Step 1: Select a region of pure background noise, then click <b style="color:var(--cyan)">Sample Noise</b>. Step 2: Select the full clip and click <b style="color:var(--cyan)">Apply Reduction</b>.</p>
-
-    <div class="nr-steps">
-      <div class="nr-step" id="nrStep1">
-        <div class="nr-step-num">1</div>
-        <div>
-          <div class="nr-step-title">Sample Noise Profile</div>
-          <div class="nr-step-desc">Select a region with only background noise (no voice/music)</div>
-          <button class="hdr-btn" style="margin-top:8px" onclick="sampleNoise()">🔍 Sample Noise</button>
-          <div class="nr-sampled" id="nrSampledMsg" style="display:none">✓ Noise profile captured</div>
-        </div>
-      </div>
-      <div class="nr-step" id="nrStep2">
-        <div class="nr-step-num">2</div>
-        <div>
-          <div class="nr-step-title">Apply Reduction</div>
-          <label>Reduction Strength <span id="nrStrengthVal">80%</span></label>
-          <input type="range" id="nrStrength" min="10" max="100" step="5" value="80"
-                 oninput="document.getElementById('nrStrengthVal').textContent=this.value+'%'"
-                 style="width:100%;margin-bottom:8px">
-          <label>Smoothing <span id="nrSmoothVal">2</span></label>
-          <input type="range" id="nrSmooth" min="0" max="6" step="1" value="2"
-                 oninput="document.getElementById('nrSmoothVal').textContent=this.value"
-                 style="width:100%;margin-bottom:8px">
-          <label style="display:flex;align-items:center;gap:5px;margin-bottom:0;text-transform:none;font-size:11px;color:var(--text-mid)">
-            <input type="checkbox" id="nrResidual"> Preview residual (hear what's removed)
-          </label>
-        </div>
-      </div>
-    </div>
-
-    <div class="modal-actions" style="margin-top:16px">
-      <button class="hdr-btn" onclick="closeModal('noiseModal')">Cancel</button>
-      <button class="hdr-btn accent" id="nrApplyBtn" onclick="applyNoiseReduction()" disabled>Apply Reduction</button>
-    </div>
-  </div>
-</div>
-
 <div class="modal-overlay" id="duckingModal">
   <div class="modal">
     <h3>🦆 MUSIC DUCKING</h3>
@@ -3108,7 +3103,8 @@ function makeTrackData(name, color) {
     volume: 1,
     pan: 0,
     gainNode: gn,
-    panNode: panner
+    panNode: panner,
+    rack: []
   };
 }
 
@@ -3146,6 +3142,7 @@ function removeTrack(id) {
   if (selTrackId === id) { selStart = selEnd = selTrackId = null; }
   renderTracks();
   updateTrackBadge();
+  renderEffectsRack();
   toast('Track removed');
 }
 
@@ -3784,7 +3781,8 @@ function snapState() {
   return tracks.map(t => ({
     id: t.id, name: t.name, color: t.color,
     muted: t.muted, solo: t.solo, volume: t.volume, pan: t.pan || 0,
-    clips: t.clips.map(c => ({ offset: c.offset, gain: c.gain, name: c.name || '', buffer: c.buffer }))
+    clips: t.clips.map(c => ({ offset: c.offset, gain: c.gain, name: c.name || '', buffer: c.buffer })),
+    rack: (t.rack || []).map(fx => ({ ...fx, params: { ...fx.params } }))
   }));
 }
 function saveUndo() {
@@ -3806,9 +3804,10 @@ function restoreState(saved) {
     gn.gain.value = s.volume;
     if (panner) panner.pan.value = s.pan || 0;
     return { ...s, pan: s.pan || 0, gainNode: gn, panNode: panner,
-      clips: s.clips.map(c => ({ offset: c.offset, gain: c.gain, name: c.name || '', buffer: c.buffer })) };
+      clips: s.clips.map(c => ({ offset: c.offset, gain: c.gain, name: c.name || '', buffer: c.buffer })),
+      rack: (s.rack || []).map(fx => ({ ...fx, params: { ...fx.params } })) };
   });
-  renderTracks(); setZoom(pixelsPerSec);
+  renderTracks(); setZoom(pixelsPerSec); renderEffectsRack();
 }
 function undo() {
   if (!undoStack.length) return;
@@ -4280,124 +4279,34 @@ function applyDucking() {
 }
 
 // ═══════════════════════════════════════════
-//  COMPRESSOR / LIMITER
+//  EFFECTS RACK (Audition-style docked panel)
 // ═══════════════════════════════════════════
+// Effects are non-destructive while they sit in the rack (just config on
+// track.rack), and get baked into the track's clips all at once, in rack
+// order, when "Apply Rack to Track" is clicked.
 
-function setCompPreset(name) {
-  const presets = {
-    podcast: { thresh: -18, ratio: 3,  attack: 5,  release: 80,  gain: 8 },
-    music:   { thresh: -12, ratio: 2,  attack: 20, release: 200, gain: 4 },
-    limit:   { thresh: -3,  ratio: 20, attack: 1,  release: 50,  gain: 0 },
-  };
-  const p = presets[name]; if (!p) return;
-  document.getElementById('compThresh').value  = p.thresh;  document.getElementById('compThreshVal').textContent  = p.thresh + ' dB';
-  document.getElementById('compRatio').value   = p.ratio;   document.getElementById('compRatioVal').textContent   = p.ratio + ':1';
-  document.getElementById('compAttack').value  = p.attack;  document.getElementById('compAttackVal').textContent  = p.attack + ' ms';
-  document.getElementById('compRelease').value = p.release; document.getElementById('compReleaseVal').textContent = p.release + ' ms';
-  document.getElementById('compGain').value    = p.gain;    document.getElementById('compGainVal').textContent    = '+' + p.gain + ' dB';
-  toast('Preset: ' + name);
-}
+function processCompressor(buf, p) {
+  const sr = buf.sampleRate;
+  const attackSamples  = Math.floor((p.attack  / 1000) * sr);
+  const releaseSamples = Math.floor((p.release / 1000) * sr);
+  const threshold   = Math.pow(10, p.thresh / 20);
+  const makeupGain  = Math.pow(10, p.gain / 20);
+  const limitThresh = p.limiter ? 0.99 : Infinity;
 
-async function applyCompressor() {
-  const tid = selTrackId;
-  if (!tid) { toast('Select a track first'); return; }
-  const track = tracks.find(t => t.id === tid);
-  if (!track || !track.clips.length) { toast('No clips on selected track'); return; }
-
-  const threshDb  = +document.getElementById('compThresh').value;
-  const ratio     = +document.getElementById('compRatio').value;
-  const attackMs  = +document.getElementById('compAttack').value;
-  const releaseMs = +document.getElementById('compRelease').value;
-  const gainDb    = +document.getElementById('compGain').value;
-  const limit     = document.getElementById('compLimiter').checked;
-
-  saveUndo();
-  closeModal('compressorModal');
-  toast('Applying compressor…');
-
-  // Process each clip's raw samples
-  for (const clip of track.clips) {
-    const buf = cowClip(clip); // copy-on-write: undo snapshots keep the original buffer
-    const sr  = buf.sampleRate;
-    const attackSamples  = Math.floor((attackMs  / 1000) * sr);
-    const releaseSamples = Math.floor((releaseMs / 1000) * sr);
-    const threshold = Math.pow(10, threshDb / 20);
-    const makeupGain = Math.pow(10, gainDb / 20);
-    const limitThresh = limit ? 0.99 : Infinity;
-
-    for (let ch = 0; ch < buf.numberOfChannels; ch++) {
-      const data = buf.getChannelData(ch);
-      let env = 0;
-      for (let i = 0; i < data.length; i++) {
-        const level = Math.abs(data[i]);
-        // Envelope follower
-        if (level > env) {
-          env += (level - env) / Math.max(1, attackSamples);
-        } else {
-          env += (level - env) / Math.max(1, releaseSamples);
-        }
-        // Gain reduction
-        let gr = 1;
-        if (env > threshold) {
-          gr = threshold * Math.pow(env / threshold, 1 / ratio) / env;
-        }
-        let s = data[i] * gr * makeupGain;
-        // Hard limiter
-        if (Math.abs(s) > limitThresh) s = Math.sign(s) * limitThresh;
-        data[i] = s;
-      }
+  for (let ch = 0; ch < buf.numberOfChannels; ch++) {
+    const data = buf.getChannelData(ch);
+    let env = 0;
+    for (let i = 0; i < data.length; i++) {
+      const level = Math.abs(data[i]);
+      if (level > env) env += (level - env) / Math.max(1, attackSamples);
+      else             env += (level - env) / Math.max(1, releaseSamples);
+      let gr = 1;
+      if (env > threshold) gr = threshold * Math.pow(env / threshold, 1 / p.ratio) / env;
+      let s = data[i] * gr * makeupGain;
+      if (Math.abs(s) > limitThresh) s = Math.sign(s) * limitThresh;
+      data[i] = s;
     }
   }
-
-  drawAll();
-  toast('✓ Compressor applied');
-}
-
-// ═══════════════════════════════════════════
-//  NOISE REDUCTION
-// ═══════════════════════════════════════════
-
-let noiseProfile = null; // Float32Array of spectral magnitudes
-
-function sampleNoise() {
-  const r = getSelRange();
-  if (!r || !selTrackId) { toast('Select a noise-only region first'); return; }
-  const track = tracks.find(t => t.id === selTrackId);
-  if (!track) return;
-
-  const FFT_SIZE = 2048;
-  const profile = new Float32Array(FFT_SIZE / 2).fill(0);
-  let frameCount = 0;
-
-  for (const clip of track.clips) {
-    const cs = clip.offset, ce = cs + clip.buffer.duration;
-    if (ce <= r.s || cs >= r.e) continue;
-    const sr   = clip.buffer.sampleRate;
-    const s1   = Math.max(0, Math.floor((r.s - cs) * sr));
-    const s2   = Math.min(clip.buffer.length, Math.floor((r.e - cs) * sr));
-    const data = clip.buffer.getChannelData(0);
-
-    // Collect FFT frames across the noise region
-    for (let start = s1; start + FFT_SIZE <= s2; start += FFT_SIZE / 2) {
-      const frame = new Float32Array(FFT_SIZE);
-      // Hann window
-      for (let i = 0; i < FFT_SIZE; i++) {
-        const w = 0.5 * (1 - Math.cos(2 * Math.PI * i / (FFT_SIZE - 1)));
-        frame[i] = data[start + i] * w;
-      }
-      const mag = simpleFft(frame);
-      for (let i = 0; i < profile.length; i++) profile[i] += mag[i];
-      frameCount++;
-    }
-  }
-
-  if (frameCount === 0) { toast('Selection too short — select more noise', true); return; }
-  for (let i = 0; i < profile.length; i++) profile[i] /= frameCount;
-  noiseProfile = profile;
-
-  document.getElementById('nrSampledMsg').style.display = 'block';
-  document.getElementById('nrApplyBtn').disabled = false;
-  toast('✓ Noise profile sampled from selection');
 }
 
 // Simple DFT magnitude (good enough for noise profiling on short buffers)
@@ -4405,8 +4314,6 @@ function simpleFft(samples) {
   const N = samples.length;
   const half = N / 2;
   const mag = new Float32Array(half);
-  // Use browser's AnalyserNode approach via OfflineAudioContext for real FFT
-  // Fall back to a fast approximation
   for (let k = 0; k < half; k++) {
     let re = 0, im = 0;
     const step = Math.max(1, Math.floor(N / 256)); // Downsample for speed
@@ -4420,72 +4327,259 @@ function simpleFft(samples) {
   return mag;
 }
 
-async function applyNoiseReduction() {
-  if (!noiseProfile) { toast('Sample noise first (Step 1)', true); return; }
-  const tid = selTrackId;
-  if (!tid) { toast('Select a track first'); return; }
-  const track = tracks.find(t => t.id === selTrackId);
+function processNoiseReduction(buf, p) {
+  if (!p.profile) return;
+  const FFT_SIZE = 2048, HOP = FFT_SIZE / 4;
+  const strength = p.strength / 100, smoothing = p.smoothing, residual = p.residual, profile = p.profile;
+
+  for (let ch = 0; ch < buf.numberOfChannels; ch++) {
+    const input   = buf.getChannelData(ch);
+    const output  = new Float32Array(input.length);
+    const hannWin = new Float32Array(FFT_SIZE);
+    for (let i = 0; i < FFT_SIZE; i++) hannWin[i] = 0.5 * (1 - Math.cos(2 * Math.PI * i / (FFT_SIZE - 1)));
+
+    for (let pos = 0; pos + FFT_SIZE <= input.length; pos += HOP) {
+      const frame = new Float32Array(FFT_SIZE);
+      for (let i = 0; i < FFT_SIZE; i++) frame[i] = input[pos + i] * hannWin[i];
+      const mag = simpleFft(frame);
+      for (let i = 0; i < mag.length; i++) {
+        const noise = profile[i] * strength * (1 + smoothing * 0.2);
+        mag[i] = residual
+          ? Math.max(0, noise - Math.max(0, mag[i] - noise))
+          : Math.max(0, mag[i] - noise);
+      }
+      const totalIn  = frame.reduce((a, b) => a + Math.abs(b), 0) / FFT_SIZE || 1;
+      const totalOut = mag.reduce((a, b) => a + b, 0) / mag.length || 0;
+      const ratio = Math.min(1, totalOut / (totalIn + 1e-10));
+      for (let i = 0; i < FFT_SIZE; i++) output[pos + i] += frame[i] * ratio;
+    }
+
+    const scale = HOP / (FFT_SIZE * 0.5);
+    for (let i = 0; i < output.length; i++) {
+      input[i] = output[i] * scale + input[i] * (1 - Math.min(1, scale));
+    }
+  }
+}
+
+function fxDefaultParams(type) {
+  if (type === 'compressor')    return { thresh: -18, ratio: 3, attack: 5, release: 80, gain: 8, limiter: false };
+  if (type === 'noiseReduction') return { strength: 80, smoothing: 2, residual: false, profile: null, sampled: false };
+  return {};
+}
+function fxLabel(type) {
+  return type === 'compressor' ? '⚡ Compressor / Limiter' : type === 'noiseReduction' ? '🔇 Noise Reduction' : type;
+}
+function fxFindTrack() { return tracks.find(t => t.id === selTrackId); }
+function fxFindEffect(fxId) {
+  const track = fxFindTrack();
+  return track ? track.rack.find(fx => fx.id === fxId) : null;
+}
+
+let fxRackCounter = 0;
+
+function fxAddEffect(type) {
+  if (!type) return;
+  const track = fxFindTrack();
+  if (!track) { toast('Select a track first', true); return; }
+  track.rack.push({ id: ++fxRackCounter, type, enabled: true, expanded: true, params: fxDefaultParams(type) });
+  renderEffectsRack();
+}
+function fxRemoveEffect(fxId) {
+  const track = fxFindTrack();
   if (!track) return;
+  track.rack = track.rack.filter(fx => fx.id !== fxId);
+  renderEffectsRack();
+}
+function fxToggleEnabled(fxId) {
+  const fx = fxFindEffect(fxId);
+  if (fx) fx.enabled = !fx.enabled;
+  renderEffectsRack();
+}
+function fxToggleExpand(fxId) {
+  const fx = fxFindEffect(fxId);
+  if (fx) fx.expanded = !fx.expanded;
+  renderEffectsRack();
+}
+function fxMoveSlot(fxId, dir) {
+  const track = fxFindTrack();
+  if (!track) return;
+  const i = track.rack.findIndex(fx => fx.id === fxId);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= track.rack.length) return;
+  [track.rack[i], track.rack[j]] = [track.rack[j], track.rack[i]];
+  renderEffectsRack();
+}
+function fxSetParam(fxId, key, val, isNumber) {
+  const fx = fxFindEffect(fxId);
+  if (!fx) return;
+  fx.params[key] = isNumber === false ? val : +val;
+}
 
-  const strength  = +document.getElementById('nrStrength').value / 100;
-  const smoothing = +document.getElementById('nrSmooth').value;
-  const residual  = document.getElementById('nrResidual').checked;
+function fxSampleNoise(fxId) {
+  const fx = fxFindEffect(fxId);
+  const track = fxFindTrack();
+  if (!fx || !track) return;
+  const r = getSelRange();
+  if (!r) { toast('Select a noise-only region first', true); return; }
 
-  saveUndo();
-  closeModal('noiseModal');
-  toast('Applying noise reduction…');
+  const FFT_SIZE = 2048;
+  const profile = new Float32Array(FFT_SIZE / 2).fill(0);
+  let frameCount = 0;
 
-  const FFT_SIZE   = 2048;
-  const HOP        = FFT_SIZE / 4;
-  const profile    = noiseProfile;
-
-  // Process each clip using overlap-add spectral subtraction
   for (const clip of track.clips) {
-    const buf = cowClip(clip); // copy-on-write: undo snapshots keep the original buffer
-    const sr  = buf.sampleRate;
-
-    for (let ch = 0; ch < buf.numberOfChannels; ch++) {
-      const input  = buf.getChannelData(ch);
-      const output = new Float32Array(input.length);
-      const hannWin = new Float32Array(FFT_SIZE);
-      for (let i = 0; i < FFT_SIZE; i++) hannWin[i] = 0.5 * (1 - Math.cos(2 * Math.PI * i / (FFT_SIZE - 1)));
-
-      for (let pos = 0; pos + FFT_SIZE <= input.length; pos += HOP) {
-        // Windowed frame
-        const frame = new Float32Array(FFT_SIZE);
-        for (let i = 0; i < FFT_SIZE; i++) frame[i] = input[pos + i] * hannWin[i];
-
-        // Get magnitude spectrum (simplified)
-        const mag = simpleFft(frame);
-
-        // Spectral subtraction
-        for (let i = 0; i < mag.length; i++) {
-          const noise = profile[i] * strength * (1 + smoothing * 0.2);
-          const reduced = residual
-            ? Math.max(0, noise - Math.max(0, mag[i] - noise))
-            : Math.max(0, mag[i] - noise);
-          mag[i] = reduced;
-        }
-
-        // Reconstruct — copy back attenuated samples proportionally
-        const totalIn  = frame.reduce((a, b) => a + Math.abs(b), 0) / FFT_SIZE || 1;
-        const totalOut = mag.reduce((a, b) => a + b, 0) / mag.length || 0;
-        const ratio    = Math.min(1, totalOut / (totalIn + 1e-10));
-        for (let i = 0; i < FFT_SIZE; i++) {
-          output[pos + i] += frame[i] * ratio;
-        }
+    const cs = clip.offset, ce = cs + clip.buffer.duration;
+    if (ce <= r.s || cs >= r.e) continue;
+    const sr   = clip.buffer.sampleRate;
+    const s1   = Math.max(0, Math.floor((r.s - cs) * sr));
+    const s2   = Math.min(clip.buffer.length, Math.floor((r.e - cs) * sr));
+    const data = clip.buffer.getChannelData(0);
+    for (let start = s1; start + FFT_SIZE <= s2; start += FFT_SIZE / 2) {
+      const frame = new Float32Array(FFT_SIZE);
+      for (let i = 0; i < FFT_SIZE; i++) {
+        const w = 0.5 * (1 - Math.cos(2 * Math.PI * i / (FFT_SIZE - 1)));
+        frame[i] = data[start + i] * w;
       }
-
-      // Normalize overlap-add
-      const scale = HOP / (FFT_SIZE * 0.5);
-      for (let i = 0; i < output.length; i++) {
-        input[i] = output[i] * scale + input[i] * (1 - Math.min(1, scale));
-      }
+      const mag = simpleFft(frame);
+      for (let i = 0; i < profile.length; i++) profile[i] += mag[i];
+      frameCount++;
     }
   }
 
+  if (frameCount === 0) { toast('Selection too short — select more noise', true); return; }
+  for (let i = 0; i < profile.length; i++) profile[i] /= frameCount;
+  fx.params.profile = profile;
+  fx.params.sampled = true;
+  renderEffectsRack();
+  toast('✓ Noise profile sampled from selection');
+}
+
+function fxApplyRack() {
+  const track = fxFindTrack();
+  if (!track) { toast('Select a track first', true); return; }
+  const active = track.rack.filter(fx => fx.enabled);
+  if (!active.length) { toast('No active effects to apply', true); return; }
+  if (!track.clips.length) { toast('No clips on selected track', true); return; }
+  const missingProfile = active.find(fx => fx.type === 'noiseReduction' && !fx.params.profile);
+  if (missingProfile) { toast('Sample a noise profile for Noise Reduction first', true); return; }
+
+  saveUndo();
+  toast('Applying effects rack…');
+
+  for (const clip of track.clips) {
+    const buf = cowClip(clip); // copy-on-write: undo snapshots keep the original buffer
+    for (const fx of active) {
+      if (fx.type === 'compressor') processCompressor(buf, fx.params);
+      else if (fx.type === 'noiseReduction') processNoiseReduction(buf, fx.params);
+    }
+    invalidateWaveCache(clip.buffer);
+  }
+
   drawAll();
-  toast('✓ Noise reduction applied');
+  toast(`✓ Applied ${active.length} effect${active.length > 1 ? 's' : ''} to "${track.name}"`);
+}
+
+function fxSlotBodyHtml(fx) {
+  const p = fx.params;
+  if (fx.type === 'compressor') {
+    return `
+      <div class="fx-row">
+        <label>Threshold <span id="fxv_${fx.id}_thresh">${p.thresh} dB</span></label>
+        <input type="range" min="-60" max="0" step="1" value="${p.thresh}"
+          oninput="document.getElementById('fxv_${fx.id}_thresh').textContent=this.value+' dB';fxSetParam(${fx.id},'thresh',this.value)">
+      </div>
+      <div class="fx-row">
+        <label>Ratio <span id="fxv_${fx.id}_ratio">${p.ratio}:1</span></label>
+        <input type="range" min="1" max="20" step="0.5" value="${p.ratio}"
+          oninput="document.getElementById('fxv_${fx.id}_ratio').textContent=this.value+':1';fxSetParam(${fx.id},'ratio',this.value)">
+      </div>
+      <div class="fx-row">
+        <label>Attack <span id="fxv_${fx.id}_attack">${p.attack} ms</span></label>
+        <input type="range" min="1" max="200" step="1" value="${p.attack}"
+          oninput="document.getElementById('fxv_${fx.id}_attack').textContent=this.value+' ms';fxSetParam(${fx.id},'attack',this.value)">
+      </div>
+      <div class="fx-row">
+        <label>Release <span id="fxv_${fx.id}_release">${p.release} ms</span></label>
+        <input type="range" min="10" max="1000" step="10" value="${p.release}"
+          oninput="document.getElementById('fxv_${fx.id}_release').textContent=this.value+' ms';fxSetParam(${fx.id},'release',this.value)">
+      </div>
+      <div class="fx-row">
+        <label>Make-up Gain <span id="fxv_${fx.id}_gain">+${p.gain} dB</span></label>
+        <input type="range" min="0" max="24" step="0.5" value="${p.gain}"
+          oninput="document.getElementById('fxv_${fx.id}_gain').textContent='+'+this.value+' dB';fxSetParam(${fx.id},'gain',this.value)">
+      </div>
+      <label class="fx-row-check">
+        <input type="checkbox" ${p.limiter ? 'checked' : ''} onchange="fxSetParam(${fx.id},'limiter',this.checked,false)"> Hard limiter at 0 dBFS
+      </label>`;
+  }
+  if (fx.type === 'noiseReduction') {
+    return `
+      <div class="fx-nr-step">Select a noise-only region on the waveform, then sample it before applying.</div>
+      <button class="fx-sample-btn ${p.sampled ? 'sampled' : ''}" onclick="fxSampleNoise(${fx.id})">${p.sampled ? '✓ Noise Profile Captured' : '🔍 Sample Noise From Selection'}</button>
+      <div class="fx-row">
+        <label>Reduction Strength <span id="fxv_${fx.id}_strength">${p.strength}%</span></label>
+        <input type="range" min="10" max="100" step="5" value="${p.strength}"
+          oninput="document.getElementById('fxv_${fx.id}_strength').textContent=this.value+'%';fxSetParam(${fx.id},'strength',this.value)">
+      </div>
+      <div class="fx-row">
+        <label>Smoothing <span id="fxv_${fx.id}_smooth">${p.smoothing}</span></label>
+        <input type="range" min="0" max="6" step="1" value="${p.smoothing}"
+          oninput="document.getElementById('fxv_${fx.id}_smooth').textContent=this.value;fxSetParam(${fx.id},'smoothing',this.value)">
+      </div>
+      <label class="fx-row-check">
+        <input type="checkbox" ${p.residual ? 'checked' : ''} onchange="fxSetParam(${fx.id},'residual',this.checked,false)"> Preview residual (hear what's removed)
+      </label>`;
+  }
+  return '';
+}
+
+function fxSlotHtml(fx, idx, total) {
+  return `
+    <div class="fx-slot ${fx.enabled ? '' : 'disabled'}">
+      <div class="fx-slot-row" onclick="fxToggleExpand(${fx.id})">
+        <span class="fx-slot-num">${idx + 1}</span>
+        <button class="fx-power" title="${fx.enabled ? 'Bypass' : 'Enable'}" onclick="event.stopPropagation();fxToggleEnabled(${fx.id})"></button>
+        <span class="fx-slot-name">${fxLabel(fx.type)}</span>
+        <div class="fx-slot-actions">
+          <button title="Move up" onclick="event.stopPropagation();fxMoveSlot(${fx.id},-1)" ${idx === 0 ? 'disabled' : ''}>▲</button>
+          <button title="Move down" onclick="event.stopPropagation();fxMoveSlot(${fx.id},1)" ${idx === total - 1 ? 'disabled' : ''}>▼</button>
+          <button title="Remove" onclick="event.stopPropagation();fxRemoveEffect(${fx.id})">✕</button>
+        </div>
+      </div>
+      ${fx.expanded ? `<div class="fx-slot-body">${fxSlotBodyHtml(fx)}</div>` : ''}
+    </div>`;
+}
+
+function renderEffectsRack() {
+  const panel = document.getElementById('effects-rack');
+  if (!panel) return;
+  const track = fxFindTrack();
+
+  if (!track) {
+    panel.innerHTML = `
+      <div class="fx-rack-header"><div class="fx-rack-title">EFFECTS RACK</div></div>
+      <div class="fx-rack-empty">Select a track to view and edit its effects chain.</div>`;
+    return;
+  }
+
+  const slotsHtml  = track.rack.map((fx, i) => fxSlotHtml(fx, i, track.rack.length)).join('');
+  const hasEnabled = track.rack.some(fx => fx.enabled);
+
+  panel.innerHTML = `
+    <div class="fx-rack-header">
+      <div class="fx-rack-title">EFFECTS RACK</div>
+      <div class="fx-rack-track"><span class="dot" style="background:${track.color}"></span>${escHtml(track.name)}</div>
+    </div>
+    <div class="fx-slots">${slotsHtml || '<div class="fx-rack-empty">No effects yet.<br>Add one below.</div>'}</div>
+    <div class="fx-add-row">
+      <select onchange="fxAddEffect(this.value);this.value=''">
+        <option value="">+ Add Effect…</option>
+        <option value="compressor">Compressor / Limiter</option>
+        <option value="noiseReduction">Noise Reduction</option>
+      </select>
+    </div>
+    <div class="fx-apply-row">
+      <button class="fx-apply-btn" onclick="fxApplyRack()" ${hasEnabled ? '' : 'disabled'}>Apply Rack to Track</button>
+    </div>`;
 }
 
 // ═══════════════════════════════════════════
@@ -4645,16 +4739,6 @@ function renderPunchOverlays(show) {
 }
 
 // Helper: open/close modals
-function showCompressorModal() {
-  if (!selTrackId) { toast('Select a track first'); return; }
-  document.getElementById('compressorModal').classList.add('active');
-}
-
-function showNoiseReductionModal() {
-  if (!selTrackId) { toast('Select a track first'); return; }
-  document.getElementById('noiseModal').classList.add('active');
-}
-
 function closeModal(id) {
   document.getElementById(id).classList.remove('active');
 }
@@ -4986,6 +5070,7 @@ function renderTracks() {
     clipsWrap.addEventListener('mousedown', e => {
       if (e.button !== 0) return;
       selTrackId = track.id;
+      renderEffectsRack();
       const tracksArea = document.getElementById('tracks-area');
       const rect = clipsWrap.getBoundingClientRect();
       const scrollX = tracksArea.scrollLeft;
@@ -5147,6 +5232,7 @@ function renderTracks() {
     clipsWrap.addEventListener('contextmenu', e => {
       e.preventDefault();
       ctxTrackId = selTrackId = track.id;
+      renderEffectsRack();
       document.querySelectorAll('.track').forEach(el2 => el2.classList.remove('selected'));
       el.classList.add('selected');
       showCtxMenu(e.clientX, e.clientY);
@@ -5891,6 +5977,7 @@ drawArtViz();
 drawTimeline();
 setTool('select');
 updateTrackBadge();
+renderEffectsRack();
 document.getElementById('zoomLabel').textContent = pixelsPerSec + 'px/s';
 initEq();
 
