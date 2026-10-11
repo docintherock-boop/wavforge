@@ -2155,8 +2155,9 @@ input[type=range].deck-pitch::-webkit-slider-thumb { -webkit-appearance: none; w
 .deck-drop-zone:hover, .deck-drop-zone.dragover { border-color: rgba(107,148,194,0.3); color: rgba(107,148,194,0.5); background: rgba(107,148,194,0.03); }
 /* Mixer */
 .dj-mixer { width: 170px; flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; padding: 12px 10px; background: rgba(6,6,18,0.55); border-left: 1px solid rgba(255,255,255,0.06); border-right: 1px solid rgba(255,255,255,0.06); overflow-y: auto; }
-.mixer-header { text-align: center; }
+.mixer-header { display: flex; align-items: center; justify-content: center; gap: 6px; }
 .mixer-title { font-family: var(--font-hud); font-size: 9px; letter-spacing: 3px; color: var(--text-lo); }
+.mixer-badge { width: 18px; height: 18px; border-radius: 50%; opacity: .75; flex-shrink: 0; filter: drop-shadow(0 0 3px rgba(0,0,0,0.5)); }
 .mixer-section { display: flex; flex-direction: column; gap: 5px; }
 .mixer-label { font-family: var(--font-mono); font-size: 7px; letter-spacing: 2px; color: var(--text-lo); text-transform: uppercase; text-align: center; }
 .mixer-cf-wrap { display: flex; align-items: center; gap: 4px; }
@@ -2709,6 +2710,7 @@ input[type=range].mixer-master::-webkit-slider-thumb { -webkit-appearance: none;
       <!-- CENTER MIXER -->
       <div class="dj-mixer">
         <div class="mixer-header">
+          <img class="mixer-badge" src="badge-wavforge.webp" alt="" aria-hidden="true">
           <span class="mixer-title">MIXER</span>
         </div>
 
